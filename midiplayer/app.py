@@ -1,4 +1,8 @@
-"""GTK4 application entry point."""
+"""GTK4 + libadwaita application entry point.
+
+Uses Adw.Application for automatic GNOME theme (dark/light) integration.
+Falls back to plain Gtk.Application if libadwaita is not installed.
+"""
 
 from __future__ import annotations
 
@@ -9,6 +13,16 @@ from typing import List
 import gi
 
 gi.require_version("Gtk", "4.0")
+
+# Try libadwaita for native GNOME theme support
+_USE_ADW = False
+try:
+    gi.require_version("Adw", "1")
+    from gi.repository import Adw  # noqa: E402
+    _USE_ADW = True
+except (ValueError, ImportError):
+    pass
+
 from gi.repository import Gdk, Gio, Gtk  # noqa: E402
 
 from .widgets.window import SheetMusicWindow
@@ -18,7 +32,10 @@ APP_ID = "com.pulpoff.midiplayer"
 _RESOURCE_DIR = os.path.join(os.path.dirname(__file__), "resources")
 
 
-class MidiPlayerApp(Gtk.Application):
+_BaseApp = Adw.Application if _USE_ADW else Gtk.Application
+
+
+class MidiPlayerApp(_BaseApp):
     def __init__(self) -> None:
         super().__init__(
             application_id=APP_ID,
@@ -27,8 +44,9 @@ class MidiPlayerApp(Gtk.Application):
         self._window: SheetMusicWindow | None = None
 
     def do_startup(self) -> None:
-        Gtk.Application.do_startup(self)
-        # Set the app icon from the bundled SVG
+        _BaseApp.do_startup(self)
+
+        # Register the icon search path
         icon_path = os.path.join(_RESOURCE_DIR, "midiplayer.svg")
         if os.path.exists(icon_path):
             display = Gdk.Display.get_default()

@@ -1,10 +1,8 @@
-"""GTK4 ApplicationWindow — the main midiplayer window.
+"""GTK4 + libadwaita ApplicationWindow — the main midiplayer window.
 
-Layout matches the original MidiSheetMusic screenshot:
-- Menu bar across the top: File / View / Color / Tracks / Notes / Help
-- Player toolbar row: transport buttons + compact speed/volume + timeline
-- Piano panel (always visible)
-- Scrollable sheet music area (hidden when no MIDI loaded)
+Uses Adw.ApplicationWindow with Adw.HeaderBar for proper GNOME theme
+integration (dark mode, rounded corners, CSD). Falls back to plain
+Gtk.ApplicationWindow + PopoverMenuBar if libadwaita is absent.
 """
 
 from __future__ import annotations
@@ -16,6 +14,15 @@ from typing import List, Optional
 import gi
 
 gi.require_version("Gtk", "4.0")
+
+_USE_ADW = False
+try:
+    gi.require_version("Adw", "1")
+    from gi.repository import Adw  # noqa: E402
+    _USE_ADW = True
+except (ValueError, ImportError):
+    pass
+
 from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from ..audio_player import AudioPlayer
@@ -28,8 +35,11 @@ from .player_widget import PlayerWidget
 from .sheet_music_widget import SheetMusicWidget
 
 
-class SheetMusicWindow(Gtk.ApplicationWindow):
-    def __init__(self, app: Gtk.Application) -> None:
+_BaseWindow = Adw.ApplicationWindow if _USE_ADW else Gtk.ApplicationWindow
+
+
+class SheetMusicWindow(_BaseWindow):
+    def __init__(self, app) -> None:
         super().__init__(application=app, title="midiplayer")
         self.set_default_size(980, 720)
         self.set_icon_name("midiplayer")
@@ -43,19 +53,47 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
         self._recent_files: List[str] = self._load_recent_files()
         self._recent_menu: Optional[Gio.Menu] = None
 
-        root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        self.set_child(root)
-
-        # Menu bar
         self._install_actions(app)
-        root.append(self._build_menu_bar())
+
+        # Build the menu model
+        menu_model = self._build_menu_model()
+
+        # Main content box
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+
+        if _USE_ADW:
+            # Use Adw.HeaderBar with a menu button for native GNOME look
+            header = Adw.HeaderBar()
+            header.set_title_widget(Adw.WindowTitle(title="midiplayer", subtitle=""))
+            self._window_title = header.get_title_widget()
+
+            # Primary menu button (hamburger)
+            menu_button = Gtk.MenuButton()
+            menu_button.set_icon_name("open-menu-symbolic")
+            menu_button.set_menu_model(menu_model)
+            header.pack_end(menu_button)
+
+            # Open button on the left
+            open_button = Gtk.Button(icon_name="document-open-symbolic")
+            open_button.set_tooltip_text("Open MIDI file")
+            open_button.connect("clicked", lambda b: self._action_open(None, None))
+            header.pack_start(open_button)
+
+            toolbar_view = Adw.ToolbarView()
+            toolbar_view.add_top_bar(header)
+            toolbar_view.set_content(content)
+            self.set_content(toolbar_view)
+        else:
+            # Fallback: plain menu bar
+            content.append(Gtk.PopoverMenuBar.new_from_model(menu_model))
+            self.set_child(content)
 
         # Player toolbar row
         self.player = PlayerWidget(self.audio)
         self.player.set_pulse_handler(self._on_player_pulse)
-        root.append(self.player)
+        content.append(self.player)
 
-        root.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
+        content.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
         # Piano panel — always visible, centered
         piano_wrap = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
@@ -64,30 +102,27 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
         piano_wrap.set_margin_bottom(4)
         self.piano = PianoWidget(white_key_width=14)
         piano_wrap.append(self.piano)
-        root.append(piano_wrap)
+        content.append(piano_wrap)
 
         self._sheet_separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        root.append(self._sheet_separator)
+        content.append(self._sheet_separator)
 
         # Scrollable sheet music area — hidden until a file is loaded
         self.scroller = Gtk.ScrolledWindow()
         self.scroller.set_hexpand(True)
-        # Don't vexpand — let the scroller fit the sheet height exactly.
-        # Horizontal scrollbar only; no vertical scroll needed in horiz mode.
         self.scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
         self.sheet_widget = SheetMusicWidget()
         self.sheet_widget.set_seek_handler(self._on_sheet_click)
         self.sheet_widget.set_scroller(self.scroller)
         self.scroller.set_child(self.sheet_widget)
-        root.append(self.scroller)
+        content.append(self.scroller)
 
         # Placeholder label shown when no MIDI is loaded
-        self._placeholder = Gtk.Label(label="Use the menu File > Open to select a MIDI file")
+        self._placeholder = Gtk.Label(label="Use the menu or Ctrl+O to open a MIDI file")
         self._placeholder.set_vexpand(True)
-        self._placeholder.set_valign(Gtk.Align.START)
-        self._placeholder.set_margin_top(20)
-        self._placeholder.set_margin_start(20)
-        root.append(self._placeholder)
+        self._placeholder.set_valign(Gtk.Align.CENTER)
+        self._placeholder.add_css_class("dim-label")
+        content.append(self._placeholder)
 
         # Start with sheet area hidden
         self._set_sheet_visible(False)
@@ -110,7 +145,7 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
     # Actions + menu
     # ----------------------------------------------------------------------
 
-    def _install_actions(self, app: Gtk.Application) -> None:
+    def _install_actions(self, app) -> None:
         simple_actions = {
             "open": self._action_open,
             "close": self._action_close,
@@ -146,52 +181,55 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
                     self.open_midi_file(path)
         return handler
 
-    def _build_menu_bar(self) -> Gtk.Widget:
+    def _build_menu_model(self) -> Gio.Menu:
         menu = Gio.Menu()
 
-        file_menu = Gio.Menu()
-        file_menu.append("Open...", "win.open")
+        # File section
+        file_section = Gio.Menu()
+        file_section.append("Open...", "win.open")
 
-        # Recent files section
         self._recent_menu = Gio.Menu()
         self._rebuild_recent_menu()
-        file_menu.append_section(None, self._recent_menu)
+        file_section.append_section(None, self._recent_menu)
 
         close_section = Gio.Menu()
         close_section.append("Close", "win.close")
         close_section.append("Quit", "win.quit")
-        file_menu.append_section(None, close_section)
+        file_section.append_section(None, close_section)
+        menu.append_submenu("File", file_section)
 
-        menu.append_submenu("File", file_menu)
-
+        # View
         view_menu = Gio.Menu()
         view_menu.append("Zoom In", "win.zoom_in")
         view_menu.append("Zoom Out", "win.zoom_out")
         view_menu.append("Zoom 100%", "win.zoom_reset")
-        scroll_menu = Gio.Menu()
-        scroll_menu.append("Scroll Vertically", "win.scroll_vertical")
-        scroll_menu.append("Scroll Horizontally", "win.scroll_horizontal")
-        view_menu.append_section(None, scroll_menu)
-        size_menu = Gio.Menu()
-        size_menu.append("Large Notes", "win.large_notes")
-        size_menu.append("Show Measure Numbers", "win.show_measures")
-        view_menu.append_section(None, size_menu)
+        scroll_section = Gio.Menu()
+        scroll_section.append("Scroll Vertically", "win.scroll_vertical")
+        scroll_section.append("Scroll Horizontally", "win.scroll_horizontal")
+        view_menu.append_section(None, scroll_section)
+        size_section = Gio.Menu()
+        size_section.append("Large Notes", "win.large_notes")
+        size_section.append("Show Measure Numbers", "win.show_measures")
+        view_menu.append_section(None, size_section)
         menu.append_submenu("View", view_menu)
 
+        # Tracks
         tracks_menu = Gio.Menu()
         tracks_menu.append("Combine Into Two Staffs", "win.two_staffs")
         menu.append_submenu("Tracks", tracks_menu)
 
+        # Notes
         notes_menu = Gio.Menu()
         notes_menu.append("Show Note Letters", "win.show_note_letters")
         notes_menu.append("Show Lyrics", "win.show_lyrics")
         menu.append_submenu("Notes", notes_menu)
 
+        # Help
         help_menu = Gio.Menu()
         help_menu.append("About", "win.about")
         menu.append_submenu("Help", help_menu)
 
-        return Gtk.PopoverMenuBar.new_from_model(menu)
+        return menu
 
     # ----------------------------------------------------------------------
     # Action handlers
@@ -244,41 +282,45 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
         except Exception:
             pass
 
-        about = Gtk.AboutDialog(
-            transient_for=self,
-            modal=True,
-            program_name="midiplayer",
-            version="0.1.0",
-            comments=(
-                "A modern GTK4 MIDI sheet music player for Linux.\n"
-                "Based on MidiSheetMusic 2.6 by Madhav Vaidyanathan.\n"
-                "Modernized and updated by Pashkovsky Alexei in 2026.\n"
-                "Ported to Python / GTK4 / Cairo / FluidSynth."
-            ),
-            website="https://github.com/pulpoff/midiplayer",
-            website_label="github.com/pulpoff/midiplayer",
-            license_type=Gtk.License.GPL_2_0,
-            copyright="Original: Madhav Vaidyanathan (GPLv2)\n"
-                      "Port: Pashkovsky Alexei, 2026",
-        )
-        if logo is not None:
-            about.set_logo(logo)
-
-        # Walk the widget tree to make the program name label non-selectable
-        # and remove the link styling that GTK4 AboutDialog adds by default.
-        def _fix_labels(widget):
-            if isinstance(widget, Gtk.Label):
-                text = widget.get_text() or ""
-                if "midiplayer" == text.strip():
-                    widget.set_selectable(False)
-                    widget.set_markup(f"<b><big>{text}</big></b>")
-            child = widget.get_first_child()
-            while child is not None:
-                _fix_labels(child)
-                child = child.get_next_sibling()
-        _fix_labels(about)
-
-        about.present()
+        if _USE_ADW:
+            about = Adw.AboutWindow(
+                transient_for=self,
+                application_name="midiplayer",
+                application_icon="midiplayer",
+                version="0.1.0",
+                comments=(
+                    "A modern GTK4 MIDI sheet music player for Linux.\n"
+                    "Based on MidiSheetMusic 2.6 by Madhav Vaidyanathan.\n"
+                    "Modernized and updated by Pashkovsky Alexei in 2026.\n"
+                    "Ported to Python / GTK4 / Cairo / FluidSynth."
+                ),
+                website="https://github.com/pulpoff/midiplayer",
+                issue_url="https://github.com/pulpoff/midiplayer/issues",
+                license_type=Gtk.License.GPL_2_0,
+                copyright="Original: Madhav Vaidyanathan (GPLv2)\nPort: Pashkovsky Alexei, 2026",
+                developer_name="Pashkovsky Alexei",
+            )
+            about.present()
+        else:
+            about = Gtk.AboutDialog(
+                transient_for=self,
+                modal=True,
+                program_name="midiplayer",
+                version="0.1.0",
+                comments=(
+                    "A modern GTK4 MIDI sheet music player for Linux.\n"
+                    "Based on MidiSheetMusic 2.6 by Madhav Vaidyanathan.\n"
+                    "Modernized and updated by Pashkovsky Alexei in 2026.\n"
+                    "Ported to Python / GTK4 / Cairo / FluidSynth."
+                ),
+                website="https://github.com/pulpoff/midiplayer",
+                website_label="github.com/pulpoff/midiplayer",
+                license_type=Gtk.License.GPL_2_0,
+                copyright="Original: Madhav Vaidyanathan (GPLv2)\nPort: Pashkovsky Alexei, 2026",
+            )
+            if logo is not None:
+                about.set_logo(logo)
+            about.present()
 
     def _action_zoom_in(self, _action, _param) -> None:
         if self.sheet is not None:
@@ -362,23 +404,40 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
         self.piano.set_midi_file(self.midifile, self.options)
 
     def _update_title(self) -> None:
-        if self.midifile is None:
-            self.set_title("midiplayer")
+        if _USE_ADW and hasattr(self, '_window_title'):
+            if self.midifile is None:
+                self._window_title.set_title("midiplayer")
+                self._window_title.set_subtitle("")
+            else:
+                self._window_title.set_title("midiplayer")
+                self._window_title.set_subtitle(os.path.basename(self.midifile.FileName))
         else:
-            self.set_title(
-                f"{os.path.basename(self.midifile.FileName)} - midiplayer"
-            )
+            if self.midifile is None:
+                self.set_title("midiplayer")
+            else:
+                self.set_title(
+                    f"{os.path.basename(self.midifile.FileName)} - midiplayer"
+                )
 
     def _show_error(self, message: str) -> None:
-        dialog = Gtk.MessageDialog(
-            transient_for=self,
-            modal=True,
-            message_type=Gtk.MessageType.ERROR,
-            buttons=Gtk.ButtonsType.OK,
-            text=message,
-        )
-        dialog.connect("response", lambda d, r: d.destroy())
-        dialog.present()
+        if _USE_ADW:
+            dialog = Adw.MessageDialog(
+                transient_for=self,
+                heading="Error",
+                body=message,
+            )
+            dialog.add_response("ok", "OK")
+            dialog.present()
+        else:
+            dialog = Gtk.MessageDialog(
+                transient_for=self,
+                modal=True,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.OK,
+                text=message,
+            )
+            dialog.connect("response", lambda d, r: d.destroy())
+            dialog.present()
 
     # ----------------------------------------------------------------------
     # Playback highlight callbacks
@@ -424,7 +483,6 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
 
     def _add_recent_file(self, path: str) -> None:
         abspath = os.path.abspath(path)
-        # Remove if already present so it moves to the top
         self._recent_files = [p for p in self._recent_files if p != abspath]
         self._recent_files.insert(0, abspath)
         self._recent_files = self._recent_files[: self._MAX_RECENT]
