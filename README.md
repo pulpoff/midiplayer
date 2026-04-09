@@ -6,7 +6,6 @@
 
 A modern GTK4 MIDI sheet music player for Linux, based on Madhav
 Vaidyanathan's [MidiSheetMusic](http://midisheetmusic.com/) 2.6.
-Modernized and updated by Pashkovsky Alexei in 2026.
 
 <p align="center">
   <img src="scr.png" alt="midiplayer screenshot" width="800">
