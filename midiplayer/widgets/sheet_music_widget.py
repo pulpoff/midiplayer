@@ -115,6 +115,13 @@ class SheetMusicWidget(Gtk.DrawingArea):
         self.set_content_width(self.sheet.total_width)
         self.set_content_height(self.sheet.total_height)
         self.queue_draw()
+
+        # Ask the window to shrink-to-fit when zooming out
+        window = self.get_root()
+        if window is not None and hasattr(window, "set_default_size"):
+            window.set_default_size(980, -1)
+            # Queue a resize so GTK recalculates the natural size
+            window.queue_resize()
         return True
 
     def _on_click(self, gesture, n_press, x, y) -> None:
