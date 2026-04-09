@@ -75,6 +75,21 @@ install_deps() {
     done
 }
 
+install_icon() {
+    # Install the SVG icon and .desktop file for GNOME to pick up
+    local icon_src="$SCRIPT_DIR/midiplayer/resources/midiplayer.svg"
+    local desktop_src="$SCRIPT_DIR/midiplayer/resources/com.pulpoff.midiplayer.desktop"
+    local icon_dir="$HOME/.local/share/icons/hicolor/scalable/apps"
+    local desktop_dir="$HOME/.local/share/applications"
+
+    if [ -f "$icon_src" ] && [ ! -f "$icon_dir/midiplayer.svg" ]; then
+        mkdir -p "$icon_dir" "$desktop_dir"
+        cp "$icon_src" "$icon_dir/midiplayer.svg"
+        cp "$desktop_src" "$desktop_dir/com.pulpoff.midiplayer.desktop" 2>/dev/null || true
+        gtk-update-icon-cache -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+    fi
+}
+
 run_app() {
     PYTHONPATH="$SCRIPT_DIR" exec "$PYTHON" -m midiplayer "$@"
 }
@@ -92,6 +107,7 @@ case "${1:-}" in
         ;;
     *)
         install_deps
+        install_icon
         run_app "$@"
         ;;
 esac

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Midi Sheet Music
+Comment=MIDI sheet music player with piano and FluidSynth audio
+Exec=python3 -m midiplayer %f
+Icon=midiplayer
+Terminal=false
+Categories=Audio;Music;Player;
+MimeType=audio/midi;audio/x-midi;

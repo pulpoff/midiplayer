@@ -9,8 +9,9 @@ Layout matches the original MidiSheetMusic screenshot:
 
 from __future__ import annotations
 
+import json
 import os
-from typing import Optional
+from typing import List, Optional
 
 import gi
 
@@ -31,11 +32,16 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
     def __init__(self, app: Gtk.Application) -> None:
         super().__init__(application=app, title="Midi Sheet Music")
         self.set_default_size(980, 720)
+        self.set_icon_name("midiplayer")
 
         self.midifile: Optional[MidiFile] = None
         self.options: Optional[MidiOptions] = None
         self.sheet: Optional[SheetMusic] = None
         self.audio = AudioPlayer()
+
+        # Recent files (persisted in ~/.config/midiplayer/recent.json)
+        self._recent_files: List[str] = self._load_recent_files()
+        self._recent_menu: Optional[Gio.Menu] = None
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.set_child(root)
@@ -66,9 +72,9 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
         # Scrollable sheet music area — hidden until a file is loaded
         self.scroller = Gtk.ScrolledWindow()
         self.scroller.set_hexpand(True)
-        self.scroller.set_vexpand(True)
-        # Enable horizontal scrolling, let vertical adapt to content
-        self.scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        # Don't vexpand — let the scroller fit the sheet height exactly.
+        # Horizontal scrollbar only; no vertical scroll needed in horiz mode.
+        self.scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
         self.sheet_widget = SheetMusicWidget()
         self.sheet_widget.set_seek_handler(self._on_sheet_click)
         self.sheet_widget.set_scroller(self.scroller)
@@ -118,13 +124,36 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
             action.connect("activate", cb)
             self.add_action(action)
 
+        # Recent file actions (recent0..recent3)
+        for i in range(4):
+            action = Gio.SimpleAction.new(f"recent{i}", None)
+            action.connect("activate", self._make_recent_handler(i))
+            self.add_action(action)
+
+    def _make_recent_handler(self, index: int):
+        def handler(_action, _param):
+            if index < len(self._recent_files):
+                path = self._recent_files[index]
+                if os.path.exists(path):
+                    self.open_midi_file(path)
+        return handler
+
     def _build_menu_bar(self) -> Gtk.Widget:
         menu = Gio.Menu()
 
         file_menu = Gio.Menu()
         file_menu.append("Open...", "win.open")
-        file_menu.append("Close", "win.close")
-        file_menu.append("Quit", "win.quit")
+
+        # Recent files section
+        self._recent_menu = Gio.Menu()
+        self._rebuild_recent_menu()
+        file_menu.append_section(None, self._recent_menu)
+
+        close_section = Gio.Menu()
+        close_section.append("Close", "win.close")
+        close_section.append("Quit", "win.quit")
+        file_menu.append_section(None, close_section)
+
         menu.append_submenu("File", file_menu)
 
         view_menu = Gio.Menu()
@@ -282,6 +311,7 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
         self.player.set_total_pulses(self.midifile.TotalPulses)
         self._set_sheet_visible(True)
         self._update_title()
+        self._add_recent_file(path)
 
     def _reload_sheet(self) -> None:
         if self.midifile is None or self.options is None:
@@ -321,3 +351,52 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
     def _on_sheet_click(self, pulse: int) -> None:
         self.audio.seek_to(pulse)
         self._on_player_pulse(pulse)
+
+    # ----------------------------------------------------------------------
+    # Recent files
+    # ----------------------------------------------------------------------
+
+    _MAX_RECENT = 4
+    _CONFIG_DIR = os.path.join(
+        os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+        "midiplayer",
+    )
+    _RECENT_PATH = os.path.join(_CONFIG_DIR, "recent.json")
+
+    @staticmethod
+    def _load_recent_files() -> List[str]:
+        try:
+            with open(SheetMusicWindow._RECENT_PATH) as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return [p for p in data if isinstance(p, str)][:SheetMusicWindow._MAX_RECENT]
+        except Exception:
+            pass
+        return []
+
+    def _save_recent_files(self) -> None:
+        try:
+            os.makedirs(self._CONFIG_DIR, exist_ok=True)
+            with open(self._RECENT_PATH, "w") as f:
+                json.dump(self._recent_files, f)
+        except Exception:
+            pass
+
+    def _add_recent_file(self, path: str) -> None:
+        abspath = os.path.abspath(path)
+        # Remove if already present so it moves to the top
+        self._recent_files = [p for p in self._recent_files if p != abspath]
+        self._recent_files.insert(0, abspath)
+        self._recent_files = self._recent_files[: self._MAX_RECENT]
+        self._save_recent_files()
+        self._rebuild_recent_menu()
+
+    def _rebuild_recent_menu(self) -> None:
+        if self._recent_menu is None:
+            return
+        self._recent_menu.remove_all()
+        for i, path in enumerate(self._recent_files):
+            if i >= self._MAX_RECENT:
+                break
+            label = os.path.basename(path)
+            self._recent_menu.append(label, f"win.recent{i}")
