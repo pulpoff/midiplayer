@@ -8,6 +8,10 @@ __pycache__/
 .venv/
 venv/
 
+# Build artifacts
+deb-build/
+*.deb
+
 # Editor
 .vscode/
 .idea/

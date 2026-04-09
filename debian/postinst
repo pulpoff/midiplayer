@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+
+# Install pyfluidsynth via pip if not already available
+if ! python3 -c "import fluidsynth" >/dev/null 2>&1; then
+    python3 -m pip install --break-system-packages pyfluidsynth 2>/dev/null \
+        || python3 -m pip install pyfluidsynth 2>/dev/null \
+        || echo "midiplayer: warning: could not install pyfluidsynth; audio may not work" >&2
+fi
+
+# Update icon cache
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+fi
+
+# Update desktop database
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database /usr/share/applications 2>/dev/null || true
+fi
+
+#DEBHELPER#
