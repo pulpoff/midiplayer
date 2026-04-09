@@ -62,13 +62,12 @@ class MidiPlayerApp(_BaseApp):
         if n_files > 0:
             path = files[0].get_path()
             if path:
-                window.open_midi_file(path)
+                window.open_midi_file(path, autoplay=True)
         window.present()
 
     def _on_command_line(self, app, cmdline) -> int:
         """Handle command-line args (file paths) for both local and remote."""
         args = cmdline.get_arguments()
-        # args[0] is the program name
         midi_file = None
         for arg in args[1:]:
             if not arg.startswith("-") and (arg.lower().endswith(".mid") or arg.lower().endswith(".midi")):
@@ -83,7 +82,7 @@ class MidiPlayerApp(_BaseApp):
 
         window = self._ensure_window()
         if midi_file:
-            window.open_midi_file(midi_file)
+            window.open_midi_file(midi_file, autoplay=True)
         window.present()
         return 0
 
