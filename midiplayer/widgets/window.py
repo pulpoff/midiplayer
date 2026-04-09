@@ -213,17 +213,6 @@ class SheetMusicWindow(_BaseWindow):
         view_menu.append_section(None, size_section)
         menu.append_submenu("View", view_menu)
 
-        # Tracks
-        tracks_menu = Gio.Menu()
-        tracks_menu.append("Combine Into Two Staffs", "win.two_staffs")
-        menu.append_submenu("Tracks", tracks_menu)
-
-        # Notes
-        notes_menu = Gio.Menu()
-        notes_menu.append("Show Note Letters", "win.show_note_letters")
-        notes_menu.append("Show Lyrics", "win.show_lyrics")
-        menu.append_submenu("Notes", notes_menu)
-
         # Help
         help_menu = Gio.Menu()
         help_menu.append("About", "win.about")
