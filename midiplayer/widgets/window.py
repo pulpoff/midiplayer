@@ -96,14 +96,11 @@ class SheetMusicWindow(_BaseWindow):
 
         content.append(Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL))
 
-        # Piano panel — always visible, centered
-        piano_wrap = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        piano_wrap.set_halign(Gtk.Align.CENTER)
-        piano_wrap.set_margin_top(4)
-        piano_wrap.set_margin_bottom(4)
+        # Piano panel — always visible, scales to fill width
         self.piano = PianoWidget(white_key_width=14)
-        piano_wrap.append(self.piano)
-        content.append(piano_wrap)
+        self.piano.set_margin_top(4)
+        self.piano.set_margin_bottom(4)
+        content.append(self.piano)
 
         self._sheet_separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
         content.append(self._sheet_separator)
