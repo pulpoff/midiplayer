@@ -72,9 +72,9 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
         # Scrollable sheet music area — hidden until a file is loaded
         self.scroller = Gtk.ScrolledWindow()
         self.scroller.set_hexpand(True)
-        self.scroller.set_vexpand(True)
-        # Enable horizontal scrolling, let vertical adapt to content
-        self.scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        # Don't vexpand — let the scroller fit the sheet height exactly.
+        # Horizontal scrollbar only; no vertical scroll needed in horiz mode.
+        self.scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.NEVER)
         self.sheet_widget = SheetMusicWidget()
         self.sheet_widget.set_seek_handler(self._on_sheet_click)
         self.sheet_widget.set_scroller(self.scroller)
