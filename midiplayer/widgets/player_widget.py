@@ -46,7 +46,7 @@ class PlayerWidget(Gtk.Box):
 
         # Speed button with popover vertical slider
         self.speed_button = Gtk.MenuButton()
-        self.speed_button.set_label("Speed: 100%")
+        self.speed_button.set_label("1x")
         self.speed_button.set_tooltip_text("Playback speed")
         speed_pop = Gtk.Popover()
         speed_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -174,7 +174,12 @@ class PlayerWidget(Gtk.Box):
 
     def _on_speed_changed(self, scale) -> None:
         value = int(scale.get_value())
-        self.speed_button.set_label(f"Speed: {value}%")
+        # Show compact multiplier: 1x, 1.5x, 0.5x etc.
+        mult = value / 100.0
+        if mult == int(mult):
+            self.speed_button.set_label(f"{int(mult)}x")
+        else:
+            self.speed_button.set_label(f"{mult:.1f}x")
         self.audio.set_speed(value)
 
     def _on_volume_changed(self, scale) -> None:
