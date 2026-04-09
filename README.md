@@ -1,7 +1,12 @@
-# midiplayer
+<p align="center">
+  <img src="midiplayer/resources/midiplayer.svg" width="96" alt="midiplayer icon">
+</p>
+
+<h1 align="center">midiplayer</h1>
 
 A modern GTK4 MIDI sheet music player for Linux, based on Madhav
 Vaidyanathan's [MidiSheetMusic](http://midisheetmusic.com/) 2.6.
+Modernized and updated by Pashkovsky Alexei in 2026.
 
 The original is a C#/Mono WinForms application that ships with a Linux build
 script targeting `xbuild` and the `timidity` CLI for playback. This project is
@@ -22,7 +27,31 @@ engraving, same piano keyboard with left-hand / right-hand shading, same
 toolbar with rewind / play / stop / fast-forward / speed / volume — while
 running on a current GNOME desktop with proper audio hardware support.
 
-## Building and running
+## Install from .deb (recommended)
+
+Download the latest `.deb` from the
+[releases page](https://github.com/pulpoff/midiplayer/releases) and install:
+
+```sh
+sudo dpkg -i midiplayer_0.1.0_all.deb
+sudo apt-get install -f   # pulls in any missing dependencies
+```
+
+Then launch from the GNOME app launcher or terminal:
+
+```sh
+midiplayer [file.mid]
+```
+
+To build the `.deb` yourself from source:
+
+```sh
+git clone https://github.com/pulpoff/midiplayer.git
+cd midiplayer
+./build-deb.sh
+```
+
+## Running from source (no install)
 
 On Debian / Ubuntu / any derivative, the whole workflow is a single command:
 

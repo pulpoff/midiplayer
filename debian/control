@@ -1,0 +1,22 @@
+Package: midiplayer
+Version: 0.1.0
+Section: sound
+Priority: optional
+Architecture: all
+Depends: python3 (>= 3.10), python3-gi, python3-gi-cairo, gir1.2-gtk-4.0, fluidsynth, libfluidsynth3, fluid-soundfont-gm
+Recommends: python3-pip
+Maintainer: Pashkovsky Alexei <pulpoff@users.noreply.github.com>
+Homepage: https://github.com/pulpoff/midiplayer
+Description: Modern GTK4 MIDI sheet music player for Linux
+ A MIDI file player that displays sheet music notation with a piano
+ keyboard, real-time note highlighting, and FluidSynth-based audio
+ synthesis. Based on MidiSheetMusic 2.6 by Madhav Vaidyanathan,
+ ported to Python / GTK4 / Cairo / FluidSynth.
+ .
+ Features:
+  - Sheet music engraving with treble/bass clef, key signatures,
+    beamed notes, accidentals, rests, and measure bars
+  - Piano keyboard with left-hand / right-hand highlighting
+  - FluidSynth audio via PipeWire / PulseAudio / ALSA
+  - Speed and volume controls with timeline scrubbing
+  - Horizontal scrolling score with smooth auto-scroll during playback
