@@ -7,7 +7,7 @@ from typing import Optional
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gdk, Gtk  # noqa: E402
+from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
 from ..sheet_music import SheetMusic
 
@@ -20,18 +20,18 @@ class SheetMusicWidget(Gtk.DrawingArea):
         self.sheet: Optional[SheetMusic] = None
         self._current_pulse = -10
         self._prev_pulse = -10
-        self._shade_x = 0  # x pixel of the currently shaded note
+        self._shade_x = 0
         self.set_draw_func(self._on_draw)
         self.set_hexpand(True)
-        self.set_vexpand(True)
-        # Click handler so the user can seek by clicking a note
+        self.set_vexpand(False)
+
         click = Gtk.GestureClick()
         click.connect("pressed", self._on_click)
         self.add_controller(click)
         self._on_seek = None
         self._scroller: Optional[Gtk.ScrolledWindow] = None
-        self._auto_zoom = True  # auto-fit zoom to window width
-        self._manual_zoom = False  # set True after user scrolls to zoom
+        self._manual_zoom = False
+        self._last_fit_width = 0
 
         # Scroll zoom
         scroll = Gtk.EventControllerScroll.new(
@@ -41,22 +41,20 @@ class SheetMusicWidget(Gtk.DrawingArea):
         self.add_controller(scroll)
 
     def set_scroller(self, scroller: Gtk.ScrolledWindow) -> None:
-        """Store a reference to the parent ScrolledWindow for auto-scroll."""
         self._scroller = scroller
-        # Watch for scroller width changes to auto-zoom
-        scroller.connect("notify::default-width", lambda *a: self._fit_zoom())
-        hadj = scroller.get_hadjustment()
-        if hadj:
-            hadj.connect("notify::page-size", lambda *a: self._fit_zoom())
 
     def set_sheet(self, sheet: Optional[SheetMusic]) -> None:
         self.sheet = sheet
-        self._manual_zoom = False  # reset on new file
-        if sheet is not None:
-            self._fit_zoom()
+        self._manual_zoom = False
+        self._last_fit_width = 0
         self._current_pulse = -10
         self._prev_pulse = -10
         self._shade_x = 0
+        if sheet is not None:
+            # Set initial content size; _on_draw will auto-fit once we
+            # know the actual viewport width.
+            self.set_content_width(sheet.total_width)
+            self.set_content_height(sheet.total_height)
         self.queue_draw()
 
     def set_seek_handler(self, callback) -> None:
@@ -66,14 +64,11 @@ class SheetMusicWidget(Gtk.DrawingArea):
         self._prev_pulse = self._current_pulse
         self._current_pulse = int(pulse)
         self.queue_draw()
-        # Auto-scroll to keep the shaded note visible
         if self._scroller is not None and self.sheet is not None and self._shade_x > 0:
             self._auto_scroll()
 
     def _auto_scroll(self) -> None:
-        """Smoothly scroll so the shaded note stays near the center."""
         hadj = self._scroller.get_hadjustment()
-        vadj = self._scroller.get_vadjustment()
         if hadj is None:
             return
 
@@ -81,14 +76,10 @@ class SheetMusicWidget(Gtk.DrawingArea):
         current_scroll = hadj.get_value()
 
         if self.sheet and not self.sheet.scrollVert:
-            # Horizontal layout: keep shade_x around 40% from the left
             target_x = self._shade_x - viewport_w * 0.4
             target_x = max(0, min(target_x, hadj.get_upper() - viewport_w))
-
-            # Smooth scroll: move a fraction of the distance each tick
             diff = target_x - current_scroll
             if abs(diff) > 2:
-                # Move faster when far away, gentle when close
                 step = diff * 0.3
                 if abs(step) < 2:
                     step = 2 if diff > 0 else -2
@@ -96,11 +87,48 @@ class SheetMusicWidget(Gtk.DrawingArea):
             else:
                 hadj.set_value(target_x)
 
+    def _get_viewport_width(self) -> int:
+        """Get the actual viewport width from the scroller or the window."""
+        if self._scroller is not None:
+            hadj = self._scroller.get_hadjustment()
+            if hadj is not None:
+                pw = hadj.get_page_size()
+                if pw > 100:
+                    return int(pw)
+            # Fallback: scroller's allocated width
+            w = self._scroller.get_width()
+            if w > 100:
+                return w
+        # Fallback: window width
+        root = self.get_root()
+        if root is not None:
+            return max(400, root.get_width() - 20)
+        return 980
+
     def _on_draw(self, area, cr, width, height) -> None:
         if self.sheet is None:
             cr.set_source_rgb(1, 1, 1)
             cr.paint()
             return
+
+        # Auto-fit: zoom sheet to fill the viewport width
+        viewport_w = self._get_viewport_width()
+        if not self._manual_zoom and viewport_w > 100:
+            if viewport_w != self._last_fit_width:
+                self._last_fit_width = viewport_w
+                base_width = self.sheet.total_width / self.sheet.zoom if self.sheet.zoom > 0 else self.sheet.total_width
+                if base_width > 0:
+                    new_zoom = max(0.3, min(4.0, viewport_w / base_width))
+                    if abs(new_zoom - self.sheet.zoom) > 0.01:
+                        self.sheet.set_zoom(new_zoom)
+                        self.set_content_width(self.sheet.total_width)
+                        self.set_content_height(self.sheet.total_height)
+                        # Resize window to fit new content height
+                        root = self.get_root()
+                        if root is not None and hasattr(root, "set_default_size"):
+                            root.set_default_size(root.get_width(), -1)
+                            GLib.idle_add(root.queue_resize)
+
         self.sheet.draw(cr, 0, 0, width, height)
         if self._current_pulse >= 0:
             x_shade, y_shade = self.sheet.shade_notes(
@@ -109,32 +137,10 @@ class SheetMusicWidget(Gtk.DrawingArea):
             if x_shade > 0:
                 self._shade_x = x_shade
 
-    def _fit_zoom(self) -> None:
-        """Auto-zoom the sheet to fit the available scroller width."""
-        if self.sheet is None or self._scroller is None or self._manual_zoom:
-            return
-        hadj = self._scroller.get_hadjustment()
-        if hadj is None:
-            return
-        available = hadj.get_page_size()
-        if available < 100:
-            # Scroller not yet laid out
-            return
-        # Calculate zoom so the sheet's unzoomed width fits the viewport
-        base_width = self.sheet.total_width / self.sheet.zoom if self.sheet.zoom > 0 else self.sheet.total_width
-        if base_width <= 0:
-            return
-        new_zoom = max(0.3, min(4.0, available / base_width))
-        self.sheet.set_zoom(new_zoom)
-        self.set_content_width(self.sheet.total_width)
-        self.set_content_height(self.sheet.total_height)
-        self.queue_draw()
-
     def _on_scroll(self, controller, dx, dy) -> bool:
-        """Mouse scroll on sheet music zooms in/out."""
         if self.sheet is None:
             return False
-        self._manual_zoom = True  # user took control, stop auto-fitting
+        self._manual_zoom = True
         if dy < 0:
             self.sheet.set_zoom(min(4.0, self.sheet.zoom + 0.1))
         elif dy > 0:
@@ -145,7 +151,6 @@ class SheetMusicWidget(Gtk.DrawingArea):
         self.set_content_height(self.sheet.total_height)
         self.queue_draw()
 
-        # Ask the window to shrink-to-fit when zooming out
         window = self.get_root()
         if window is not None and hasattr(window, "set_default_size"):
             window.set_default_size(980, -1)
