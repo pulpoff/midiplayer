@@ -177,7 +177,15 @@ class AudioPlayer:
                 pass
 
     def set_speed(self, percent: int) -> None:
+        old = self._speed_percent
         self._speed_percent = max(1, min(200, percent))
+        # If playing, restart the loop from the current position so the
+        # new tempo takes effect immediately. Without this, decreasing
+        # speed makes the next event's target_sec land in the past
+        # (since elapsed wall-clock time was consumed at the old faster
+        # rate), causing the loop to rapid-fire all remaining events.
+        if self._state == AudioPlayer.STATE_PLAYING and old != self._speed_percent:
+            self.seek_to(self._current_pulse)
 
     @property
     def total_pulses(self) -> int:
