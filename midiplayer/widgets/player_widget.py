@@ -1,9 +1,6 @@
-"""GTK4 toolbar row with Rewind / Play / Stop / FastForward + speed + volume.
+"""GTK4 toolbar: transport buttons + compact speed/volume popovers + timeline.
 
-Matches the original MidiSheetMusic player panel exactly: four round
-buttons, a "Speed: 100%" label followed by a slider, a volume speaker
-icon followed by a second slider. The buttons use standard GNOME symbolic
-icons so they pick up the current theme.
+Layout:  [<<] [>||] [Stop] [>>]  Speed:100%  Vol:100%  |=====>---------|  0:32 / 2:15
 """
 
 from __future__ import annotations
@@ -20,16 +17,16 @@ from ..audio_player import AudioPlayer
 
 class PlayerWidget(Gtk.Box):
     def __init__(self, audio: AudioPlayer) -> None:
-        super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.audio = audio
         self.set_margin_start(8)
         self.set_margin_end(8)
-        self.set_margin_top(6)
-        self.set_margin_bottom(6)
+        self.set_margin_top(4)
+        self.set_margin_bottom(4)
 
         self._on_pulse_changed: Optional[Callable[[float], None]] = None
 
-        # Buttons
+        # Transport buttons
         self.rewind_button = self._mk_button(
             "media-seek-backward-symbolic", "Rewind one measure", self._on_rewind
         )
@@ -47,33 +44,76 @@ class PlayerWidget(Gtk.Box):
         self.append(self.stop_button)
         self.append(self.ff_button)
 
-        # Speed label + slider
-        self.speed_label = Gtk.Label(label="Speed: 100%")
-        self.speed_label.set_margin_start(16)
-        self.append(self.speed_label)
+        # Speed button with popover vertical slider
+        self.speed_button = Gtk.MenuButton()
+        self.speed_button.set_label("Speed: 100%")
+        self.speed_button.set_tooltip_text("Playback speed")
+        speed_pop = Gtk.Popover()
+        speed_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        speed_box.set_margin_top(8)
+        speed_box.set_margin_bottom(8)
+        speed_box.set_margin_start(8)
+        speed_box.set_margin_end(8)
         self.speed_scale = Gtk.Scale.new_with_range(
-            Gtk.Orientation.HORIZONTAL, 1, 150, 1
+            Gtk.Orientation.VERTICAL, 1, 150, 1
         )
+        self.speed_scale.set_inverted(True)  # high values at top
         self.speed_scale.set_value(100)
-        self.speed_scale.set_hexpand(True)
-        self.speed_scale.set_draw_value(False)
+        self.speed_scale.set_size_request(-1, 180)
+        self.speed_scale.set_draw_value(True)
+        self.speed_scale.set_value_pos(Gtk.PositionType.BOTTOM)
         self.speed_scale.connect("value-changed", self._on_speed_changed)
-        self.append(self.speed_scale)
+        # Add marks
+        for v in (25, 50, 75, 100, 125, 150):
+            self.speed_scale.add_mark(v, Gtk.PositionType.RIGHT, str(v) if v % 50 == 0 else None)
+        speed_box.append(Gtk.Label(label="Speed %"))
+        speed_box.append(self.speed_scale)
+        speed_pop.set_child(speed_box)
+        self.speed_button.set_popover(speed_pop)
+        self.append(self.speed_button)
 
-        # Volume icon + slider
-        volume_icon = Gtk.Image.new_from_icon_name("audio-volume-high-symbolic")
-        volume_icon.set_margin_start(16)
-        self.append(volume_icon)
+        # Volume button with popover vertical slider
+        self.volume_button = Gtk.MenuButton()
+        self.volume_button.set_icon_name("audio-volume-high-symbolic")
+        self.volume_button.set_tooltip_text("Volume")
+        vol_pop = Gtk.Popover()
+        vol_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        vol_box.set_margin_top(8)
+        vol_box.set_margin_bottom(8)
+        vol_box.set_margin_start(8)
+        vol_box.set_margin_end(8)
         self.volume_scale = Gtk.Scale.new_with_range(
-            Gtk.Orientation.HORIZONTAL, 0, 100, 1
+            Gtk.Orientation.VERTICAL, 0, 100, 1
         )
+        self.volume_scale.set_inverted(True)
         self.volume_scale.set_value(100)
-        self.volume_scale.set_hexpand(True)
-        self.volume_scale.set_draw_value(False)
+        self.volume_scale.set_size_request(-1, 180)
+        self.volume_scale.set_draw_value(True)
+        self.volume_scale.set_value_pos(Gtk.PositionType.BOTTOM)
         self.volume_scale.connect("value-changed", self._on_volume_changed)
-        self.append(self.volume_scale)
+        for v in (0, 25, 50, 75, 100):
+            self.volume_scale.add_mark(v, Gtk.PositionType.RIGHT, str(v) if v % 50 == 0 else None)
+        vol_box.append(Gtk.Label(label="Volume"))
+        vol_box.append(self.volume_scale)
+        vol_pop.set_child(vol_box)
+        self.volume_button.set_popover(vol_pop)
+        self.append(self.volume_button)
 
-        # Timer: 50ms tick while playing to update highlighting
+        # Timeline progress bar
+        self.progress = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 1, 0.001)
+        self.progress.set_draw_value(False)
+        self.progress.set_hexpand(True)
+        self.progress.connect("value-changed", self._on_progress_seek)
+        self._user_seeking = False
+        self.append(self.progress)
+
+        # Time label  "0:00 / 0:00"
+        self.time_label = Gtk.Label(label="0:00 / 0:00")
+        self.time_label.set_margin_start(4)
+        self.time_label.add_css_class("monospace")
+        self.append(self.time_label)
+
+        # Timer
         self._timer_id = 0
         self.audio.set_pulse_callback(self._on_audio_pulse)
 
@@ -93,6 +133,11 @@ class PlayerWidget(Gtk.Box):
         self.audio.stop()
         self.play_button.get_child().set_from_icon_name("media-playback-start-symbolic")
         self.play_button.set_tooltip_text("Play")
+        self._update_progress(0.0)
+
+    def set_total_pulses(self, total: int) -> None:
+        """Called when a new file is loaded to configure the timeline."""
+        self.progress.set_range(0, max(1, total))
 
     # ----------------------------------------------------------------------
 
@@ -114,6 +159,7 @@ class PlayerWidget(Gtk.Box):
         self.play_button.get_child().set_from_icon_name("media-playback-start-symbolic")
         self.play_button.set_tooltip_text("Play")
         self._stop_timer()
+        self._update_progress(0.0)
         if self._on_pulse_changed is not None:
             self._on_pulse_changed(-10)
 
@@ -125,13 +171,50 @@ class PlayerWidget(Gtk.Box):
 
     def _on_speed_changed(self, scale) -> None:
         value = int(scale.get_value())
-        self.speed_label.set_text(f"Speed: {value}%")
+        self.speed_button.set_label(f"Speed: {value}%")
         self.audio.set_speed(value)
 
     def _on_volume_changed(self, scale) -> None:
-        self.audio.set_volume(int(scale.get_value()))
+        value = int(scale.get_value())
+        self.audio.set_volume(value)
+        # Update icon based on level
+        if value == 0:
+            self.volume_button.set_icon_name("audio-volume-muted-symbolic")
+        elif value < 33:
+            self.volume_button.set_icon_name("audio-volume-low-symbolic")
+        elif value < 66:
+            self.volume_button.set_icon_name("audio-volume-medium-symbolic")
+        else:
+            self.volume_button.set_icon_name("audio-volume-high-symbolic")
+
+    def _on_progress_seek(self, scale) -> None:
+        if self._user_seeking:
+            return
+        pulse = scale.get_value()
+        self.audio.seek_to(pulse)
+        if self._on_pulse_changed is not None:
+            self._on_pulse_changed(pulse)
 
     # ----------------------------------------------------------------------
+
+    def _update_progress(self, pulse: float) -> None:
+        """Update the timeline slider and time label without triggering seek."""
+        self._user_seeking = True
+        self.progress.set_value(pulse)
+        self._user_seeking = False
+
+        # Format time labels
+        total_pulses = self.audio.total_pulses
+        if total_pulses > 0 and self.audio._midifile is not None:
+            timesig = self.audio._midifile.Time
+            sec_per_pulse = (timesig.Tempo / 1_000_000.0) / timesig.Quarter
+            cur_sec = pulse * sec_per_pulse
+            tot_sec = total_pulses * sec_per_pulse
+            cur_m, cur_s = divmod(int(cur_sec), 60)
+            tot_m, tot_s = divmod(int(tot_sec), 60)
+            self.time_label.set_text(f"{cur_m}:{cur_s:02d} / {tot_m}:{tot_s:02d}")
+        else:
+            self.time_label.set_text("0:00 / 0:00")
 
     def _start_timer(self) -> None:
         if self._timer_id == 0:
@@ -143,8 +226,10 @@ class PlayerWidget(Gtk.Box):
             self._timer_id = 0
 
     def _on_timer_tick(self) -> bool:
+        pulse = self.audio.current_pulse
+        self._update_progress(pulse)
         if self._on_pulse_changed is not None:
-            self._on_pulse_changed(self.audio.current_pulse)
+            self._on_pulse_changed(pulse)
         if self.audio.state != AudioPlayer.STATE_PLAYING:
             self._timer_id = 0
             self.play_button.get_child().set_from_icon_name("media-playback-start-symbolic")
@@ -153,6 +238,4 @@ class PlayerWidget(Gtk.Box):
         return True
 
     def _on_audio_pulse(self, pulse: float) -> None:
-        # Called from the audio thread — just wake the main loop.
-        # The real update happens in the timer tick which runs on the main loop.
         pass

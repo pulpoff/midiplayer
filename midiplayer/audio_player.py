@@ -38,7 +38,7 @@ class AudioPlayer:
 
         self._midifile: Optional[MidiFile] = None
         self._options: Optional[MidiOptions] = None
-        self._events: List = []  # flat list of (abs_pulse, channel, note, vel, track)
+        self._events: List = []
         self._thread: Optional[threading.Thread] = None
         self._stop_flag = threading.Event()
         self._state = AudioPlayer.STATE_STOPPED
@@ -48,6 +48,7 @@ class AudioPlayer:
         self._pause_pulse: float = 0.0
         self._lock = threading.Lock()
         self._on_pulse_changed: Optional[Callable[[float], None]] = None
+        self._total_pulses: int = 0
 
     # ----------------------------------------------------------------------
     # Lifecycle
@@ -76,10 +77,18 @@ class AudioPlayer:
         try:
             import fluidsynth  # type: ignore
         except ImportError:
+            print("midiplayer: pyfluidsynth not installed — no audio")
             return False
-        self._synth = fluidsynth.Synth()
-        # Try modern audio drivers in order; whichever loads first wins.
-        for driver in ("pipewire", "pulseaudio", "alsa"):
+
+        # Create synth with generous polyphony and gain
+        self._synth = fluidsynth.Synth(gain=1.0, samplerate=44100)
+        self._synth.setting("synth.polyphony", 512)
+
+        # Try audio drivers in preference order.
+        # PipeWire exposes a PulseAudio compat layer, so 'pulseaudio' works
+        # on both PipeWire and plain PulseAudio systems. Direct 'pipewire'
+        # driver often fails with missing SPA_PLUGIN_DIR.
+        for driver in ("pulseaudio", "alsa", "pipewire"):
             try:
                 self._synth.start(driver=driver)
                 self._driver_name = driver
@@ -91,15 +100,23 @@ class AudioPlayer:
                 self._synth.start()
                 self._driver_name = "default"
             except Exception:
+                print("midiplayer: could not start any FluidSynth audio driver")
+                self._synth.delete()
                 self._synth = None
                 return False
+
+        print(f"midiplayer: FluidSynth using driver '{self._driver_name}'"
+              f", soundfont: {self._soundfont_path}")
+
         if self._soundfont_path:
             try:
                 self._sfid = self._synth.sfload(self._soundfont_path)
                 for ch in range(16):
                     self._synth.program_select(ch, self._sfid, 0, 0)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"midiplayer: could not load soundfont: {e}")
+        else:
+            print("midiplayer: no soundfont found — audio will be silent")
         return True
 
     def close(self) -> None:
@@ -119,6 +136,7 @@ class AudioPlayer:
         self.stop()
         self._midifile = midifile
         self._options = options
+        self._total_pulses = midifile.TotalPulses
         self._rebuild_event_schedule()
 
     def _rebuild_event_schedule(self) -> None:
@@ -128,20 +146,17 @@ class AudioPlayer:
             return
 
         events: List = []
-        # We iterate over the parsed tracks (already filtered by options.tracks
-        # when via change_midi_notes would drop muted tracks from display — but
-        # for playback we keep them and respect ``options.mute`` instead).
         for tracknum, track in enumerate(self._midifile.Tracks):
             if tracknum < len(self._options.mute) and self._options.mute[tracknum]:
                 continue
             channel = tracknum % 16
+            if channel == 9:
+                channel = 9  # percussion stays on 9
             instr = (
                 self._options.instruments[tracknum]
                 if tracknum < len(self._options.instruments)
                 else track.Instrument
             )
-            if channel == 9:  # percussion
-                instr = 0
             transpose = self._options.transpose
             for note in track.Notes:
                 number = max(0, min(127, note.Number + transpose))
@@ -154,15 +169,19 @@ class AudioPlayer:
 
     def set_volume(self, percent: int) -> None:
         self._volume_percent = max(0, min(100, percent))
-        # FluidSynth master gain is 0.0 - 10.0; typical playback sits at ~0.5
         if self._synth is not None:
             try:
+                # Map 0-100% to gain 0.0-2.0
                 self._synth.setting("synth.gain", self._volume_percent / 100.0 * 2.0)
             except Exception:
                 pass
 
     def set_speed(self, percent: int) -> None:
         self._speed_percent = max(1, min(200, percent))
+
+    @property
+    def total_pulses(self) -> int:
+        return self._total_pulses
 
     # ----------------------------------------------------------------------
     # Transport
@@ -262,7 +281,6 @@ class AudioPlayer:
         if self._midifile is None:
             return 0.0
         timesig = self._midifile.Time
-        # microseconds per quarter note / pulses per quarter note / 1e6
         sec_per_pulse = (timesig.Tempo / 1_000_000.0) / timesig.Quarter
         return pulses * sec_per_pulse * (100.0 / self._speed_percent)
 
@@ -294,7 +312,6 @@ class AudioPlayer:
             now_sec = time.monotonic() - start_wall
             sleep_sec = target_sec - now_sec
             if sleep_sec > 0:
-                # Sleep in small slices so stop_flag is responsive
                 end_time = time.monotonic() + sleep_sec
                 while not self._stop_flag.is_set():
                     remaining = end_time - time.monotonic()
@@ -304,7 +321,6 @@ class AudioPlayer:
             if self._stop_flag.is_set():
                 break
 
-            # Dispatch event
             kind, channel, note, vel, _instr = event[1], event[2], event[3], event[4], event[5]
             if self._synth is not None:
                 try:
@@ -322,7 +338,6 @@ class AudioPlayer:
 
         self._all_notes_off()
         if not self._stop_flag.is_set():
-            # Reached end of song naturally
             self._state = AudioPlayer.STATE_STOPPED
             self._current_pulse = 0.0
             self._pause_pulse = 0.0
