@@ -8,6 +8,10 @@ A modern GTK4 MIDI sheet music player for Linux, based on Madhav
 Vaidyanathan's [MidiSheetMusic](http://midisheetmusic.com/) 2.6.
 Modernized and updated by Pashkovsky Alexei in 2026.
 
+<p align="center">
+  <img src="scr.png" alt="midiplayer screenshot" width="800">
+</p>
+
 The original is a C#/Mono WinForms application that ships with a Linux build
 script targeting `xbuild` and the `timidity` CLI for playback. This project is
 a ground-up Python port that keeps the same look and layout algorithms but
