@@ -74,8 +74,21 @@ class MidiPlayerApp(_BaseApp):
 def main(argv: List[str] | None = None) -> int:
     if argv is None:
         argv = sys.argv
-    app = MidiPlayerApp()
-    return app.run(argv)
+    try:
+        app = MidiPlayerApp()
+        return app.run(argv)
+    except Exception:
+        # Log crash to a file so GNOME desktop launches can be debugged
+        import traceback
+        log_dir = os.path.join(
+            os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),
+            "midiplayer",
+        )
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, "crash.log")
+        with open(log_path, "w") as f:
+            traceback.print_exc(file=f)
+        raise
 
 
 if __name__ == "__main__":

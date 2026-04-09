@@ -46,26 +46,17 @@ find "$APP_DIR" -name "*.pyc" -delete 2>/dev/null || true
 BIN_DIR="$INSTALL_ROOT/usr/bin"
 mkdir -p "$BIN_DIR"
 cat > "$BIN_DIR/midiplayer" << 'LAUNCHER'
-#!/usr/bin/python3
-import sys
-import os
+#!/bin/bash
+# midiplayer launcher — wraps the Python app with proper environment
+export PYTHONPATH="/usr/lib/midiplayer${PYTHONPATH:+:$PYTHONPATH}"
 
-# Ensure our package is importable
-sys.path.insert(0, "/usr/lib/midiplayer")
+# Ensure pip --user packages (like pyfluidsynth) are findable
+USER_SITE="$(python3 -c 'import site; print(site.getusersitepackages())' 2>/dev/null)"
+if [ -n "$USER_SITE" ] && [ -d "$USER_SITE" ]; then
+    export PYTHONPATH="${PYTHONPATH}:${USER_SITE}"
+fi
 
-# Also check common pip --user install paths for pyfluidsynth
-_user_site = os.path.expanduser("~/.local/lib/python3/dist-packages")
-if os.path.isdir(_user_site) and _user_site not in sys.path:
-    sys.path.append(_user_site)
-
-# Try version-specific too
-import sysconfig
-_user_site2 = sysconfig.get_path("purelib", "posix_user")
-if _user_site2 and os.path.isdir(_user_site2) and _user_site2 not in sys.path:
-    sys.path.append(_user_site2)
-
-from midiplayer.app import main
-sys.exit(main())
+exec python3 -m midiplayer "$@"
 LAUNCHER
 chmod 755 "$BIN_DIR/midiplayer"
 
