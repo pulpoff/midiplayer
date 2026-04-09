@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from typing import List
 
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gio, Gtk  # noqa: E402
+from gi.repository import Gdk, Gio, Gtk  # noqa: E402
 
 from .widgets.window import SheetMusicWindow
 
 
 APP_ID = "com.pulpoff.midiplayer"
+_RESOURCE_DIR = os.path.join(os.path.dirname(__file__), "resources")
 
 
 class MidiPlayerApp(Gtk.Application):
@@ -23,6 +25,16 @@ class MidiPlayerApp(Gtk.Application):
             flags=Gio.ApplicationFlags.HANDLES_OPEN,
         )
         self._window: SheetMusicWindow | None = None
+
+    def do_startup(self) -> None:
+        Gtk.Application.do_startup(self)
+        # Set the app icon from the bundled SVG
+        icon_path = os.path.join(_RESOURCE_DIR, "midiplayer.svg")
+        if os.path.exists(icon_path):
+            display = Gdk.Display.get_default()
+            if display is not None:
+                theme = Gtk.IconTheme.get_for_display(display)
+                theme.add_search_path(_RESOURCE_DIR)
 
     def do_activate(self) -> None:
         self._ensure_window().present()
