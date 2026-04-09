@@ -247,8 +247,32 @@ class AudioPlayer:
             self._on_pulse_changed(self._current_pulse)
 
     def seek_to(self, pulse: float) -> None:
+        """Seek to a specific pulse position.
+
+        If currently playing, restarts playback from the new position.
+        """
+        was_playing = (self._state == AudioPlayer.STATE_PLAYING)
+        if was_playing:
+            # Stop the current play loop without resetting position to 0
+            self._stop_flag.set()
+            if self._thread is not None:
+                self._thread.join(timeout=1.0)
+                self._thread = None
+            if self._synth is not None:
+                self._all_notes_off()
+
         self._current_pulse = max(0.0, pulse)
         self._pause_pulse = self._current_pulse
+
+        if was_playing:
+            # Restart from the new position
+            self._state = AudioPlayer.STATE_PLAYING
+            self._stop_flag.clear()
+            self._thread = threading.Thread(
+                target=self._play_loop, name="midiplayer-audio", daemon=True
+            )
+            self._thread.start()
+
         if self._on_pulse_changed:
             self._on_pulse_changed(self._current_pulse)
 

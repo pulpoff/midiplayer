@@ -138,10 +138,6 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
         view_menu.append_section(None, size_menu)
         menu.append_submenu("View", view_menu)
 
-        color_menu = Gio.Menu()
-        color_menu.append("Note Colors...", "win.about")
-        menu.append_submenu("Color", color_menu)
-
         tracks_menu = Gio.Menu()
         tracks_menu.append("Combine Into Two Staffs", "win.two_staffs")
         menu.append_submenu("Tracks", tracks_menu)
@@ -197,16 +193,19 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
         self.destroy()
 
     def _action_about(self, _action, _param) -> None:
-        about = Gtk.AboutDialog()
-        about.set_program_name("midiplayer")
-        about.set_comments(
-            "A modern GTK4 MIDI sheet music player for Linux.\n\n"
-            "Based on MidiSheetMusic 2.6 by Madhav Vaidyanathan (GPLv2).\n"
-            "Ported to Python / GTK4 / Cairo / FluidSynth."
+        about = Gtk.AboutDialog(
+            transient_for=self,
+            modal=True,
+            program_name="Midi Sheet Music",
+            version="0.1.0",
+            comments=(
+                "A modern GTK4 MIDI sheet music player for Linux.\n"
+                "Based on MidiSheetMusic 2.6 by Madhav Vaidyanathan.\n"
+                "Ported to Python / GTK4 / Cairo / FluidSynth."
+            ),
+            website="https://github.com/pulpoff/midiplayer",
+            license_type=Gtk.License.GPL_2_0,
         )
-        about.set_license_type(Gtk.License.GPL_2_0)
-        about.set_transient_for(self)
-        about.set_modal(True)
         about.present()
 
     def _action_zoom_in(self, _action, _param) -> None:
