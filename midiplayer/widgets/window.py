@@ -41,7 +41,8 @@ _BaseWindow = Adw.ApplicationWindow if _USE_ADW else Gtk.ApplicationWindow
 class SheetMusicWindow(_BaseWindow):
     def __init__(self, app) -> None:
         super().__init__(application=app, title="midiplayer")
-        self.set_default_size(980, 720)
+        # Width only — height will be determined by content (no empty space)
+        self.set_default_size(980, -1)
         self.set_icon_name("midiplayer")
 
         self.midifile: Optional[MidiFile] = None
@@ -117,10 +118,10 @@ class SheetMusicWindow(_BaseWindow):
         self.scroller.set_child(self.sheet_widget)
         content.append(self.scroller)
 
-        # Placeholder label shown when no MIDI is loaded
+        # Placeholder label shown when no MIDI is loaded (no vexpand — no empty space)
         self._placeholder = Gtk.Label(label="Use the menu or Ctrl+O to open a MIDI file")
-        self._placeholder.set_vexpand(True)
-        self._placeholder.set_valign(Gtk.Align.CENTER)
+        self._placeholder.set_margin_top(12)
+        self._placeholder.set_margin_bottom(12)
         self._placeholder.add_css_class("dim-label")
         content.append(self._placeholder)
 
