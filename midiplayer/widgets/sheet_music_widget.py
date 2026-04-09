@@ -7,7 +7,7 @@ from typing import Optional
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk  # noqa: E402
+from gi.repository import Gdk, Gtk  # noqa: E402
 
 from ..sheet_music import SheetMusic
 
@@ -30,6 +30,13 @@ class SheetMusicWidget(Gtk.DrawingArea):
         self.add_controller(click)
         self._on_seek = None
         self._scroller: Optional[Gtk.ScrolledWindow] = None
+
+        # Scroll zoom: Ctrl+scroll to zoom in/out
+        scroll = Gtk.EventControllerScroll.new(
+            Gtk.EventControllerScrollFlags.VERTICAL
+        )
+        scroll.connect("scroll", self._on_scroll)
+        self.add_controller(scroll)
 
     def set_scroller(self, scroller: Gtk.ScrolledWindow) -> None:
         """Store a reference to the parent ScrolledWindow for auto-scroll."""
@@ -94,6 +101,21 @@ class SheetMusicWidget(Gtk.DrawingArea):
             )
             if x_shade > 0:
                 self._shade_x = x_shade
+
+    def _on_scroll(self, controller, dx, dy) -> bool:
+        """Mouse scroll on sheet music zooms in/out."""
+        if self.sheet is None:
+            return False
+        if dy < 0:
+            self.sheet.set_zoom(min(4.0, self.sheet.zoom + 0.1))
+        elif dy > 0:
+            self.sheet.set_zoom(max(0.3, self.sheet.zoom - 0.1))
+        else:
+            return False
+        self.set_content_width(self.sheet.total_width)
+        self.set_content_height(self.sheet.total_height)
+        self.queue_draw()
+        return True
 
     def _on_click(self, gesture, n_press, x, y) -> None:
         if self.sheet is None or self._on_seek is None:
