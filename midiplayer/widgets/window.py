@@ -288,7 +288,6 @@ class SheetMusicWindow(_BaseWindow):
                 issue_url="https://github.com/pulpoff/midiplayer/issues",
                 license_type=Gtk.License.GPL_2_0,
                 copyright="Original: Madhav Vaidyanathan (GPLv2)\nPort: Pashkovsky Alexei, 2026",
-                developer_name="Pashkovsky Alexei",
             )
             about.present()
         else:
