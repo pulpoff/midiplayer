@@ -118,7 +118,7 @@ class SheetMusicWidget(Gtk.DrawingArea):
                 self._last_fit_width = viewport_w
                 base_width = self.sheet.total_width / self.sheet.zoom if self.sheet.zoom > 0 else self.sheet.total_width
                 if base_width > 0:
-                    new_zoom = max(0.3, min(4.0, viewport_w / base_width))
+                    new_zoom = max(0.6, min(4.0, viewport_w / base_width))
                     if abs(new_zoom - self.sheet.zoom) > 0.01:
                         self.sheet.set_zoom(new_zoom)
                         self.set_content_width(self.sheet.total_width)
@@ -144,7 +144,7 @@ class SheetMusicWidget(Gtk.DrawingArea):
         if dy < 0:
             self.sheet.set_zoom(min(4.0, self.sheet.zoom + 0.1))
         elif dy > 0:
-            self.sheet.set_zoom(max(0.3, self.sheet.zoom - 0.1))
+            self.sheet.set_zoom(max(0.6, self.sheet.zoom - 0.1))
         else:
             return False
         self.set_content_width(self.sheet.total_width)
