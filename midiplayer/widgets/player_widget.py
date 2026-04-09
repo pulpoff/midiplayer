@@ -174,7 +174,6 @@ class PlayerWidget(Gtk.Box):
 
     def _on_speed_changed(self, scale) -> None:
         value = int(scale.get_value())
-        # Show compact multiplier: 1x, 1.5x, 0.5x etc.
         mult = value / 100.0
         if mult == int(mult):
             self.speed_button.set_label(f"{int(mult)}x")
