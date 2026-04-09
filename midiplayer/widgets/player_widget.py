@@ -1,6 +1,6 @@
 """GTK4 toolbar: transport buttons + compact speed/volume popovers + timeline.
 
-Layout:  [<<] [>||] [Stop] [>>]  Speed:100%  Vol:100%  |=====>---------|  0:32 / 2:15
+Layout:  [<<] [>||] [Stop] [>>]  Speed:100%  |=====>---------|  0:32 / 2:15  [Vol]
 """
 
 from __future__ import annotations
@@ -57,13 +57,12 @@ class PlayerWidget(Gtk.Box):
         self.speed_scale = Gtk.Scale.new_with_range(
             Gtk.Orientation.VERTICAL, 1, 150, 1
         )
-        self.speed_scale.set_inverted(True)  # high values at top
+        self.speed_scale.set_inverted(True)
         self.speed_scale.set_value(100)
         self.speed_scale.set_size_request(-1, 180)
         self.speed_scale.set_draw_value(True)
         self.speed_scale.set_value_pos(Gtk.PositionType.BOTTOM)
         self.speed_scale.connect("value-changed", self._on_speed_changed)
-        # Add marks
         for v in (25, 50, 75, 100, 125, 150):
             self.speed_scale.add_mark(v, Gtk.PositionType.RIGHT, str(v) if v % 50 == 0 else None)
         speed_box.append(Gtk.Label(label="Speed %"))
@@ -72,10 +71,26 @@ class PlayerWidget(Gtk.Box):
         self.speed_button.set_popover(speed_pop)
         self.append(self.speed_button)
 
-        # Volume button with popover vertical slider
+        # Timeline progress bar (in the middle, expands)
+        self.progress = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 1, 0.001)
+        self.progress.set_draw_value(False)
+        self.progress.set_hexpand(True)
+        # Guard: only react to user-initiated drags, not programmatic updates
+        self._programmatic_update = False
+        self.progress.connect("value-changed", self._on_progress_changed)
+        self.append(self.progress)
+
+        # Time label  "0:00 / 0:00"
+        self.time_label = Gtk.Label(label="0:00 / 0:00")
+        self.time_label.set_margin_start(4)
+        self.time_label.add_css_class("monospace")
+        self.append(self.time_label)
+
+        # Volume button with popover vertical slider — on the RIGHT after timeline
         self.volume_button = Gtk.MenuButton()
         self.volume_button.set_icon_name("audio-volume-high-symbolic")
         self.volume_button.set_tooltip_text("Volume")
+        self.volume_button.set_margin_start(4)
         vol_pop = Gtk.Popover()
         vol_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         vol_box.set_margin_top(8)
@@ -98,20 +113,6 @@ class PlayerWidget(Gtk.Box):
         vol_pop.set_child(vol_box)
         self.volume_button.set_popover(vol_pop)
         self.append(self.volume_button)
-
-        # Timeline progress bar
-        self.progress = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 1, 0.001)
-        self.progress.set_draw_value(False)
-        self.progress.set_hexpand(True)
-        self.progress.connect("value-changed", self._on_progress_seek)
-        self._user_seeking = False
-        self.append(self.progress)
-
-        # Time label  "0:00 / 0:00"
-        self.time_label = Gtk.Label(label="0:00 / 0:00")
-        self.time_label.set_margin_start(4)
-        self.time_label.add_css_class("monospace")
-        self.append(self.time_label)
 
         # Timer
         self._timer_id = 0
@@ -137,7 +138,9 @@ class PlayerWidget(Gtk.Box):
 
     def set_total_pulses(self, total: int) -> None:
         """Called when a new file is loaded to configure the timeline."""
+        self._programmatic_update = True
         self.progress.set_range(0, max(1, total))
+        self._programmatic_update = False
 
     # ----------------------------------------------------------------------
 
@@ -177,7 +180,6 @@ class PlayerWidget(Gtk.Box):
     def _on_volume_changed(self, scale) -> None:
         value = int(scale.get_value())
         self.audio.set_volume(value)
-        # Update icon based on level
         if value == 0:
             self.volume_button.set_icon_name("audio-volume-muted-symbolic")
         elif value < 33:
@@ -187,11 +189,17 @@ class PlayerWidget(Gtk.Box):
         else:
             self.volume_button.set_icon_name("audio-volume-high-symbolic")
 
-    def _on_progress_seek(self, scale) -> None:
-        if self._user_seeking:
+    def _on_progress_changed(self, scale) -> None:
+        """Handle timeline slider value-changed.
+
+        Only act on user-initiated changes. Programmatic updates from the
+        timer set ``_programmatic_update`` to suppress re-seeking.
+        """
+        if self._programmatic_update:
             return
         pulse = scale.get_value()
         self.audio.seek_to(pulse)
+        self._update_time_label(pulse)
         if self._on_pulse_changed is not None:
             self._on_pulse_changed(pulse)
 
@@ -199,11 +207,12 @@ class PlayerWidget(Gtk.Box):
 
     def _update_progress(self, pulse: float) -> None:
         """Update the timeline slider and time label without triggering seek."""
-        self._user_seeking = True
+        self._programmatic_update = True
         self.progress.set_value(pulse)
-        self._user_seeking = False
+        self._programmatic_update = False
+        self._update_time_label(pulse)
 
-        # Format time labels
+    def _update_time_label(self, pulse: float) -> None:
         total_pulses = self.audio.total_pulses
         if total_pulses > 0 and self.audio._midifile is not None:
             timesig = self.audio._midifile.Time

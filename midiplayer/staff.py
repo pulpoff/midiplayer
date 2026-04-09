@@ -285,6 +285,11 @@ class Staff:
     ) -> int:
         """Shade the chord at ``current_pulse`` and un-shade the one at ``prev_pulse``.
 
+        The shade persists from a chord's start until the **next chord's**
+        start time (skipping bars, blanks, rests). This keeps the highlight
+        visible for the full duration of each note rather than blinking away
+        as soon as a bar line or rest intervenes.
+
         Returns the updated ``x_shade`` (x pixel of the currently shaded note),
         which the window uses for auto-scroll.
         """
@@ -302,14 +307,13 @@ class Staff:
                 continue
 
             start = curr.StartTime
-            if i + 2 < len(self.symbols) and isinstance(
-                self.symbols[i + 1], BarSymbol
-            ):
-                end = self.symbols[i + 2].StartTime
-            elif i + 1 < len(self.symbols):
-                end = self.symbols[i + 1].StartTime
-            else:
-                end = self._endtime
+
+            # Find the start time of the NEXT chord (skip bars, blanks, rests)
+            end = self._endtime
+            for j in range(i + 1, len(self.symbols)):
+                if isinstance(self.symbols[j], ChordSymbol):
+                    end = self.symbols[j].StartTime
+                    break
 
             if start > prev_pulse and start > current_pulse:
                 if x_shade == 0:
