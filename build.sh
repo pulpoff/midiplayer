@@ -18,25 +18,30 @@ cd "$SCRIPT_DIR"
 
 PYTHON=${PYTHON:-python3}
 
+# System packages from apt
 APT_PACKAGES=(
     python3
+    python3-pip
+    python3-venv
     python3-gi
     python3-gi-cairo
-    python3-cairo
     gir1.2-gtk-4.0
     fluidsynth
-    python3-fluidsynth
+    libfluidsynth3
     fluid-soundfont-gm
 )
 
-have_apt_packages() {
-    dpkg -s "$@" >/dev/null 2>&1
-}
+# Python packages not in apt (installed via pip)
+PIP_PACKAGES=(
+    pyfluidsynth
+)
 
 install_deps() {
     if ! command -v apt-get >/dev/null 2>&1; then
         echo "warning: apt-get not found; skipping automatic dependency install." >&2
-        echo "Please install the following manually: ${APT_PACKAGES[*]}" >&2
+        echo "Please install the following manually:" >&2
+        echo "  apt: ${APT_PACKAGES[*]}" >&2
+        echo "  pip: ${PIP_PACKAGES[*]}" >&2
         return
     fi
 
@@ -48,18 +53,26 @@ install_deps() {
         fi
     done
 
-    if [ ${#missing[@]} -eq 0 ]; then
-        return
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo "Installing missing system packages: ${missing[*]}"
+        if [ "$(id -u)" -eq 0 ]; then
+            apt-get update
+            apt-get install -y "${missing[@]}"
+        else
+            sudo apt-get update
+            sudo apt-get install -y "${missing[@]}"
+        fi
     fi
 
-    echo "Installing missing packages: ${missing[*]}"
-    if [ "$(id -u)" -eq 0 ]; then
-        apt-get update
-        apt-get install -y "${missing[@]}"
-    else
-        sudo apt-get update
-        sudo apt-get install -y "${missing[@]}"
-    fi
+    # Install Python packages via pip (--break-system-packages for PEP 668 distros)
+    for pkg in "${PIP_PACKAGES[@]}"; do
+        if ! "$PYTHON" -c "import fluidsynth" >/dev/null 2>&1; then
+            echo "Installing pip package: $pkg"
+            "$PYTHON" -m pip install --break-system-packages "$pkg" 2>/dev/null \
+                || "$PYTHON" -m pip install --user "$pkg" 2>/dev/null \
+                || echo "warning: could not install $pkg via pip; audio playback may not work." >&2
+        fi
+    done
 }
 
 run_app() {
