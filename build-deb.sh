@@ -13,7 +13,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 cd "$SCRIPT_DIR"
 
 PKG_NAME="midiplayer"
-PKG_VERSION="0.1.0"
+PKG_VERSION="0.1.1"
 DEB_DIR="$SCRIPT_DIR/deb-build"
 INSTALL_ROOT="$DEB_DIR/${PKG_NAME}_${PKG_VERSION}_all"
 

@@ -33,17 +33,15 @@ _RESOURCE_DIR = os.path.join(os.path.dirname(__file__), "resources")
 
 _BaseApp = Adw.Application if _USE_ADW else Gtk.Application
 
-# Store file to open (passed via argv before GTK takes over)
-_pending_file: str | None = None
-
 
 class MidiPlayerApp(_BaseApp):
     def __init__(self) -> None:
         super().__init__(
             application_id=APP_ID,
-            flags=Gio.ApplicationFlags.NON_UNIQUE,
+            flags=Gio.ApplicationFlags.HANDLES_OPEN | Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
         )
         self._window: SheetMusicWindow | None = None
+        self.connect("command-line", self._on_command_line)
 
     def do_startup(self) -> None:
         _BaseApp.do_startup(self)
@@ -57,13 +55,37 @@ class MidiPlayerApp(_BaseApp):
                 theme.add_search_path(_RESOURCE_DIR)
 
     def do_activate(self) -> None:
-        global _pending_file
+        self._ensure_window().present()
+
+    def do_open(self, files, n_files, hint) -> None:
         window = self._ensure_window()
-        if _pending_file is not None:
-            path = _pending_file
-            _pending_file = None
-            window.open_midi_file(path)
+        if n_files > 0:
+            path = files[0].get_path()
+            if path:
+                window.open_midi_file(path)
         window.present()
+
+    def _on_command_line(self, app, cmdline) -> int:
+        """Handle command-line args (file paths) for both local and remote."""
+        args = cmdline.get_arguments()
+        # args[0] is the program name
+        midi_file = None
+        for arg in args[1:]:
+            if not arg.startswith("-") and (arg.lower().endswith(".mid") or arg.lower().endswith(".midi")):
+                path = arg
+                if not os.path.isabs(path):
+                    cwd = cmdline.get_cwd()
+                    if cwd:
+                        path = os.path.join(cwd, path)
+                if os.path.isfile(path):
+                    midi_file = os.path.abspath(path)
+                    break
+
+        window = self._ensure_window()
+        if midi_file:
+            window.open_midi_file(midi_file)
+        window.present()
+        return 0
 
     def _ensure_window(self) -> SheetMusicWindow:
         if self._window is None:
@@ -72,22 +94,11 @@ class MidiPlayerApp(_BaseApp):
 
 
 def main(argv: List[str] | None = None) -> int:
-    global _pending_file
     if argv is None:
         argv = sys.argv
-
-    # Extract MIDI file from args before GTK sees them
-    # (GTK strips its own args but doesn't know about our files)
-    for arg in argv[1:]:
-        if not arg.startswith("-") and (arg.endswith(".mid") or arg.endswith(".midi")):
-            if os.path.isfile(arg):
-                _pending_file = os.path.abspath(arg)
-                break
-
     try:
         app = MidiPlayerApp()
-        # Only pass argv[0] to GTK — we handle file args ourselves
-        return app.run([argv[0]] if argv else [])
+        return app.run(argv)
     except Exception:
         import traceback
         log_dir = os.path.join(
