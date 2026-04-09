@@ -93,6 +93,14 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
         self._set_sheet_visible(False)
         self._update_title()
 
+        # Keyboard shortcuts
+        app.set_accels_for_action("win.zoom_in", ["plus", "equal", "KP_Add", "<Control>plus", "<Control>equal"])
+        app.set_accels_for_action("win.zoom_out", ["minus", "KP_Subtract", "<Control>minus"])
+        app.set_accels_for_action("win.zoom_reset", ["0", "<Control>0"])
+        app.set_accels_for_action("win.open", ["<Control>o"])
+        app.set_accels_for_action("win.quit", ["<Control>q"])
+        app.set_accels_for_action("win.close", ["<Control>w"])
+
     def _set_sheet_visible(self, visible: bool) -> None:
         self.scroller.set_visible(visible)
         self._sheet_separator.set_visible(visible)
