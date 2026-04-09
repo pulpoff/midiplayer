@@ -1,0 +1,14 @@
+# Extracted original source (kept as tarball instead)
+MidiSheetMusic-2.6-linux-src/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Editor
+.vscode/
+.idea/
+*.swp
