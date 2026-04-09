@@ -369,7 +369,7 @@ class SheetMusicWindow(_BaseWindow):
     # File loading
     # ----------------------------------------------------------------------
 
-    def open_midi_file(self, path: str) -> None:
+    def open_midi_file(self, path: str, autoplay: bool = False) -> None:
         try:
             self.midifile = MidiFile(path)
         except MidiFileException as exc:
@@ -383,6 +383,8 @@ class SheetMusicWindow(_BaseWindow):
         self._set_sheet_visible(True)
         self._update_title()
         self._add_recent_file(path)
+        if autoplay:
+            self.player._on_play_pause(None)
 
     def _reload_sheet(self) -> None:
         if self.midifile is None or self.options is None:
