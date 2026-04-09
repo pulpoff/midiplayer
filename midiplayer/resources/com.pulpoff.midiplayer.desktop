@@ -7,4 +7,4 @@ Exec=/usr/bin/midiplayer %f
 Icon=midiplayer
 Terminal=false
 Categories=Audio;Music;Player;
-MimeType=audio/midi;audio/x-midi;
+MimeType=audio/midi;audio/x-midi;application/x-midi;audio/mid;

@@ -89,7 +89,7 @@ Exec=/usr/bin/midiplayer %U
 Icon=midiplayer
 Terminal=false
 Categories=Audio;Music;Player;
-MimeType=audio/midi;audio/x-midi;
+MimeType=audio/midi;audio/x-midi;application/x-midi;audio/mid;
 StartupWMClass=com.pulpoff.midiplayer
 StartupNotify=true
 DESKTOP
@@ -101,6 +101,16 @@ cat > "$MIME_DIR/com.pulpoff.midiplayer.xml" << 'MIME'
 <?xml version="1.0" encoding="UTF-8"?>
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
   <mime-type type="audio/midi">
+    <comment>MIDI audio</comment>
+    <glob pattern="*.mid"/>
+    <glob pattern="*.midi"/>
+  </mime-type>
+  <mime-type type="audio/x-midi">
+    <comment>MIDI audio</comment>
+    <glob pattern="*.mid"/>
+    <glob pattern="*.midi"/>
+  </mime-type>
+  <mime-type type="application/x-midi">
     <comment>MIDI audio</comment>
     <glob pattern="*.mid"/>
     <glob pattern="*.midi"/>
