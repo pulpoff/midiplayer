@@ -16,7 +16,7 @@ from typing import List, Optional
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gio, GLib, Gtk  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from ..audio_player import AudioPlayer
 from ..midi_file import MidiFile
@@ -225,6 +225,17 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
         self.destroy()
 
     def _action_about(self, _action, _param) -> None:
+        icon_path = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "resources", "midiplayer.svg"
+        )
+        logo = None
+        try:
+            from gi.repository import GdkPixbuf  # noqa: E402
+            logo = GdkPixbuf.Pixbuf.new_from_file_at_scale(icon_path, 128, 128, True)
+            logo = Gdk.Texture.new_for_pixbuf(logo)
+        except Exception:
+            pass
+
         about = Gtk.AboutDialog(
             transient_for=self,
             modal=True,
@@ -233,11 +244,17 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
             comments=(
                 "A modern GTK4 MIDI sheet music player for Linux.\n"
                 "Based on MidiSheetMusic 2.6 by Madhav Vaidyanathan.\n"
+                "Modernized and updated by Pashkovsky Alexei in 2026.\n"
                 "Ported to Python / GTK4 / Cairo / FluidSynth."
             ),
             website="https://github.com/pulpoff/midiplayer",
+            website_label="github.com/pulpoff/midiplayer",
             license_type=Gtk.License.GPL_2_0,
+            copyright="Original: Madhav Vaidyanathan (GPLv2)\n"
+                      "Port: Pashkovsky Alexei, 2026",
         )
+        if logo is not None:
+            about.set_logo(logo)
         about.present()
 
     def _action_zoom_in(self, _action, _param) -> None:
