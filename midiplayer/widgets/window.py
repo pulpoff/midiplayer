@@ -274,7 +274,7 @@ class SheetMusicWindow(_BaseWindow):
                 transient_for=self,
                 application_name="MIDI player",
                 application_icon="midiplayer",
-                version="0.1.1",
+                version="0.1.2",
                 comments=(
                     "A modern GTK4 MIDI sheet music player for Linux.\n"
                     "Based on MidiSheetMusic 2.6 by Madhav Vaidyanathan.\n"
@@ -292,7 +292,7 @@ class SheetMusicWindow(_BaseWindow):
                 transient_for=self,
                 modal=True,
                 program_name="MIDI player",
-                version="0.1.1",
+                version="0.1.2",
                 comments=(
                     "A modern GTK4 MIDI sheet music player for Linux.\n"
                     "Based on MidiSheetMusic 2.6 by Madhav Vaidyanathan.\n"
