@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=midiplayer
+Name=MIDI player
 Comment=MIDI sheet music player with piano and FluidSynth audio
 StartupWMClass=com.pulpoff.midiplayer
 Exec=/usr/bin/midiplayer %f

@@ -40,7 +40,7 @@ _BaseWindow = Adw.ApplicationWindow if _USE_ADW else Gtk.ApplicationWindow
 
 class SheetMusicWindow(_BaseWindow):
     def __init__(self, app) -> None:
-        super().__init__(application=app, title="midiplayer")
+        super().__init__(application=app, title="MIDI player")
         # Width only — height will be determined by content (no empty space)
         self.set_default_size(980, -1)
         self.set_icon_name("midiplayer")
@@ -65,7 +65,7 @@ class SheetMusicWindow(_BaseWindow):
         if _USE_ADW:
             # Use Adw.HeaderBar with a menu button for native GNOME look
             header = Adw.HeaderBar()
-            header.set_title_widget(Adw.WindowTitle(title="midiplayer", subtitle=""))
+            header.set_title_widget(Adw.WindowTitle(title="MIDI player", subtitle=""))
             self._window_title = header.get_title_widget()
 
             # Primary menu button (hamburger)
@@ -275,7 +275,7 @@ class SheetMusicWindow(_BaseWindow):
         if _USE_ADW:
             about = Adw.AboutWindow(
                 transient_for=self,
-                application_name="midiplayer",
+                application_name="MIDI player",
                 application_icon="midiplayer",
                 version="0.1.0",
                 comments=(
@@ -294,7 +294,7 @@ class SheetMusicWindow(_BaseWindow):
             about = Gtk.AboutDialog(
                 transient_for=self,
                 modal=True,
-                program_name="midiplayer",
+                program_name="MIDI player",
                 version="0.1.0",
                 comments=(
                     "A modern GTK4 MIDI sheet music player for Linux.\n"
@@ -395,17 +395,17 @@ class SheetMusicWindow(_BaseWindow):
     def _update_title(self) -> None:
         if _USE_ADW and hasattr(self, '_window_title'):
             if self.midifile is None:
-                self._window_title.set_title("midiplayer")
+                self._window_title.set_title("MIDI player")
                 self._window_title.set_subtitle("")
             else:
-                self._window_title.set_title("midiplayer")
+                self._window_title.set_title("MIDI player")
                 self._window_title.set_subtitle(os.path.basename(self.midifile.FileName))
         else:
             if self.midifile is None:
-                self.set_title("midiplayer")
+                self.set_title("MIDI player")
             else:
                 self.set_title(
-                    f"{os.path.basename(self.midifile.FileName)} - midiplayer"
+                    f"{os.path.basename(self.midifile.FileName)} - MIDI player"
                 )
 
     def _show_error(self, message: str) -> None:
