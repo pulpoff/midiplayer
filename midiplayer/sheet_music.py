@@ -60,6 +60,8 @@ class SheetMusic:
             self.mainkey = KeySignature.from_notescale(options.key)
 
         self.numtracks = len(tracks)
+        self._timesig = time
+        self._total_pulses = midifile.TotalPulses
         last_start = midifile.end_time() + options.shifttime
 
         # Create all symbols per track
@@ -465,6 +467,24 @@ class SheetMusic:
     # Drawing
     # ----------------------------------------------------------------------
 
+    def _get_time_marker_pulses(self, interval_sec: float = 30.0) -> List[int]:
+        """Return pulse times for every ``interval_sec`` seconds."""
+        if not self.staffs or self._timesig is None:
+            return []
+        sec_per_pulse = (self._timesig.Tempo / 1_000_000.0) / self._timesig.Quarter
+        if sec_per_pulse <= 0:
+            return []
+        pulses_per_interval = int(interval_sec / sec_per_pulse)
+        if pulses_per_interval <= 0:
+            return []
+        result = []
+        pulse = pulses_per_interval
+        total = self._total_pulses
+        while pulse < total:
+            result.append(pulse)
+            pulse += pulses_per_interval
+        return result
+
     def draw(self, cr, clip_x: int, clip_y: int, clip_w: int, clip_h: int) -> None:
         cr.save()
         cr.scale(self.zoom, self.zoom)
@@ -473,6 +493,7 @@ class SheetMusic:
         cr.set_source_rgb(0, 0, 0)
 
         ypos = 0
+        total_height = 0
         scaled_y = clip_y / self.zoom
         scaled_h = clip_h / self.zoom
         for staff in self.staffs:
@@ -483,6 +504,21 @@ class SheetMusic:
                 staff.draw(cr, int(clip_x / self.zoom), int(clip_w / self.zoom))
                 cr.translate(0, -ypos)
             ypos += staff.Height
+            total_height = ypos
+
+        # Draw 30-second time marker lines in light green
+        marker_pulses = self._get_time_marker_pulses(30.0)
+        if marker_pulses and self.staffs:
+            # Use the first staff to map pulse -> x pixel
+            first_staff = self.staffs[0]
+            for pulse in marker_pulses:
+                x = first_staff.x_for_pulse(pulse)
+                if x > 0:
+                    cr.set_source_rgba(0.4, 0.8, 0.4, 0.5)  # light green, semi-transparent
+                    cr.set_line_width(1)
+                    cr.move_to(x + 0.5, 0)
+                    cr.line_to(x + 0.5, total_height)
+                    cr.stroke()
 
         cr.restore()
 

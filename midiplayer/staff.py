@@ -371,3 +371,14 @@ class Staff:
                 return pulse_time
             xpos += sym.Width
         return pulse_time
+
+    def x_for_pulse(self, pulse: int) -> int:
+        """Return the x pixel position for a given pulse time, or -1 if outside."""
+        if pulse < self._starttime or pulse > self._endtime:
+            return -1
+        xpos = self._keysig_width
+        for sym in self.symbols:
+            if sym.StartTime >= pulse:
+                return xpos
+            xpos += sym.Width
+        return xpos
