@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="midiplayer/resources/midiplayer.svg" width="96" alt="midiplayer icon">
+  <img src="midiplayer/resources/midiplayer.svg" width="96" alt="MIDI player icon">
 </p>
 
-<h1 align="center">midiplayer</h1>
+<h1 align="center">MIDI player</h1>
 
 A modern GTK4 MIDI sheet music player for Linux, based on Madhav
 Vaidyanathan's [MidiSheetMusic](http://midisheetmusic.com/) 2.6.

@@ -23,7 +23,7 @@ try:
 except (ValueError, ImportError):
     pass
 
-from gi.repository import Gdk, Gio, Gtk  # noqa: E402
+from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
 from .widgets.window import SheetMusicWindow
 
@@ -31,15 +31,17 @@ from .widgets.window import SheetMusicWindow
 APP_ID = "com.pulpoff.midiplayer"
 _RESOURCE_DIR = os.path.join(os.path.dirname(__file__), "resources")
 
-
 _BaseApp = Adw.Application if _USE_ADW else Gtk.Application
+
+# Store file to open (passed via argv before GTK takes over)
+_pending_file: str | None = None
 
 
 class MidiPlayerApp(_BaseApp):
     def __init__(self) -> None:
         super().__init__(
             application_id=APP_ID,
-            flags=Gio.ApplicationFlags.HANDLES_OPEN,
+            flags=Gio.ApplicationFlags.NON_UNIQUE,
         )
         self._window: SheetMusicWindow | None = None
 
@@ -55,14 +57,12 @@ class MidiPlayerApp(_BaseApp):
                 theme.add_search_path(_RESOURCE_DIR)
 
     def do_activate(self) -> None:
-        self._ensure_window().present()
-
-    def do_open(self, files, n_files, hint) -> None:
+        global _pending_file
         window = self._ensure_window()
-        if n_files > 0:
-            path = files[0].get_path()
-            if path:
-                window.open_midi_file(path)
+        if _pending_file is not None:
+            path = _pending_file
+            _pending_file = None
+            window.open_midi_file(path)
         window.present()
 
     def _ensure_window(self) -> SheetMusicWindow:
@@ -72,13 +72,23 @@ class MidiPlayerApp(_BaseApp):
 
 
 def main(argv: List[str] | None = None) -> int:
+    global _pending_file
     if argv is None:
         argv = sys.argv
+
+    # Extract MIDI file from args before GTK sees them
+    # (GTK strips its own args but doesn't know about our files)
+    for arg in argv[1:]:
+        if not arg.startswith("-") and (arg.endswith(".mid") or arg.endswith(".midi")):
+            if os.path.isfile(arg):
+                _pending_file = os.path.abspath(arg)
+                break
+
     try:
         app = MidiPlayerApp()
-        return app.run(argv)
+        # Only pass argv[0] to GTK — we handle file args ourselves
+        return app.run([argv[0]] if argv else [])
     except Exception:
-        # Log crash to a file so GNOME desktop launches can be debugged
         import traceback
         log_dir = os.path.join(
             os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),

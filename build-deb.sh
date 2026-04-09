@@ -66,7 +66,7 @@ mkdir -p "$DESKTOP_DIR"
 cat > "$DESKTOP_DIR/com.pulpoff.midiplayer.desktop" << 'DESKTOP'
 [Desktop Entry]
 Type=Application
-Name=midiplayer
+Name=MIDI player
 Comment=MIDI sheet music player with piano and FluidSynth audio
 Exec=/usr/bin/midiplayer %f
 Icon=midiplayer
