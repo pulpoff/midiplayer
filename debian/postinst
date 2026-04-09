@@ -23,4 +23,11 @@ if command -v update-mime-database >/dev/null 2>&1; then
     update-mime-database /usr/share/mime 2>/dev/null || true
 fi
 
+# Register as default handler for MIDI files (for all users)
+if command -v xdg-mime >/dev/null 2>&1; then
+    xdg-mime default com.pulpoff.midiplayer.desktop audio/midi 2>/dev/null || true
+    xdg-mime default com.pulpoff.midiplayer.desktop audio/x-midi 2>/dev/null || true
+    xdg-mime default com.pulpoff.midiplayer.desktop application/x-midi 2>/dev/null || true
+fi
+
 #DEBHELPER#
