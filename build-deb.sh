@@ -29,8 +29,6 @@ cp "$SCRIPT_DIR/debian/postinst"  "$INSTALL_ROOT/DEBIAN/postinst"
 cp "$SCRIPT_DIR/debian/copyright" "$INSTALL_ROOT/DEBIAN/copyright"
 chmod 755 "$INSTALL_ROOT/DEBIAN/postinst"
 
-# Calculate installed size (in KB) later after copying files
-
 # ---- Application files ----
 APP_DIR="$INSTALL_ROOT/usr/lib/midiplayer"
 mkdir -p "$APP_DIR"
@@ -43,20 +41,38 @@ find "$APP_DIR" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || tru
 find "$APP_DIR" -name "*.pyc" -delete 2>/dev/null || true
 
 # ---- Launcher script ----
+# Use a Python script (not bash) with a different name than the package
+# to avoid import confusion. The shebang uses the absolute python3 path.
 BIN_DIR="$INSTALL_ROOT/usr/bin"
 mkdir -p "$BIN_DIR"
 cat > "$BIN_DIR/midiplayer" << 'LAUNCHER'
-#!/bin/bash
-# midiplayer launcher — wraps the Python app with proper environment
-export PYTHONPATH="/usr/lib/midiplayer${PYTHONPATH:+:$PYTHONPATH}"
+#!/usr/bin/python3
+import sys
+import os
+import site
 
-# Ensure pip --user packages (like pyfluidsynth) are findable
-USER_SITE="$(python3 -c 'import site; print(site.getusersitepackages())' 2>/dev/null)"
-if [ -n "$USER_SITE" ] && [ -d "$USER_SITE" ]; then
-    export PYTHONPATH="${PYTHONPATH}:${USER_SITE}"
-fi
+# Add our package to the path
+sys.path.insert(0, "/usr/lib/midiplayer")
 
-exec python3 -m midiplayer "$@"
+# Add user site-packages (pip --user installs like pyfluidsynth)
+user_site = site.getusersitepackages()
+if os.path.isdir(user_site) and user_site not in sys.path:
+    sys.path.append(user_site)
+
+# Redirect stderr to a log file for debugging desktop launches
+_log_dir = os.path.join(
+    os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),
+    "midiplayer",
+)
+try:
+    os.makedirs(_log_dir, exist_ok=True)
+    _log = open(os.path.join(_log_dir, "launch.log"), "w")
+    sys.stderr = _log
+except Exception:
+    pass
+
+from midiplayer.app import main
+sys.exit(main())
 LAUNCHER
 chmod 755 "$BIN_DIR/midiplayer"
 
@@ -67,14 +83,30 @@ cat > "$DESKTOP_DIR/com.pulpoff.midiplayer.desktop" << 'DESKTOP'
 [Desktop Entry]
 Type=Application
 Name=MIDI player
+GenericName=MIDI Player
 Comment=MIDI sheet music player with piano and FluidSynth audio
-Exec=/usr/bin/midiplayer %f
+Exec=/usr/bin/midiplayer %U
 Icon=midiplayer
 Terminal=false
 Categories=Audio;Music;Player;
 MimeType=audio/midi;audio/x-midi;
 StartupWMClass=com.pulpoff.midiplayer
+StartupNotify=true
 DESKTOP
+
+# ---- MIME type registration ----
+MIME_DIR="$INSTALL_ROOT/usr/share/mime/packages"
+mkdir -p "$MIME_DIR"
+cat > "$MIME_DIR/com.pulpoff.midiplayer.xml" << 'MIME'
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="audio/midi">
+    <comment>MIDI audio</comment>
+    <glob pattern="*.mid"/>
+    <glob pattern="*.midi"/>
+  </mime-type>
+</mime-info>
+MIME
 
 # ---- Icon ----
 ICON_DIR="$INSTALL_ROOT/usr/share/icons/hicolor/scalable/apps"
