@@ -8,7 +8,7 @@ A modern GTK4 MIDI sheet music player for Linux, based on Madhav
 Vaidyanathan's [MidiSheetMusic](http://midisheetmusic.com/) 2.6.
 
 <p align="center">
-  <img src="scr.png" alt="midiplayer screenshot" width="800">
+  <img src="scr3.png" alt="MIDI player screenshot" width="800">
 </p>
 
 The original is a C#/Mono WinForms application that ships with a Linux build
