@@ -46,9 +46,24 @@ find "$APP_DIR" -name "*.pyc" -delete 2>/dev/null || true
 BIN_DIR="$INSTALL_ROOT/usr/bin"
 mkdir -p "$BIN_DIR"
 cat > "$BIN_DIR/midiplayer" << 'LAUNCHER'
-#!/usr/bin/env python3
+#!/usr/bin/python3
 import sys
+import os
+
+# Ensure our package is importable
 sys.path.insert(0, "/usr/lib/midiplayer")
+
+# Also check common pip --user install paths for pyfluidsynth
+_user_site = os.path.expanduser("~/.local/lib/python3/dist-packages")
+if os.path.isdir(_user_site) and _user_site not in sys.path:
+    sys.path.append(_user_site)
+
+# Try version-specific too
+import sysconfig
+_user_site2 = sysconfig.get_path("purelib", "posix_user")
+if _user_site2 and os.path.isdir(_user_site2) and _user_site2 not in sys.path:
+    sys.path.append(_user_site2)
+
 from midiplayer.app import main
 sys.exit(main())
 LAUNCHER
@@ -62,7 +77,7 @@ cat > "$DESKTOP_DIR/com.pulpoff.midiplayer.desktop" << 'DESKTOP'
 Type=Application
 Name=midiplayer
 Comment=MIDI sheet music player with piano and FluidSynth audio
-Exec=midiplayer %f
+Exec=/usr/bin/midiplayer %f
 Icon=midiplayer
 Terminal=false
 Categories=Audio;Music;Player;
