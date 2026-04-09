@@ -74,7 +74,7 @@ class MidiOptions:
                 self.mute[i] = True
 
         self.useDefaultInstruments = True
-        self.scrollVert = True
+        self.scrollVert = False
         self.largeNoteSize = False
         self.twoStaffs = (numtracks == 1)
         self.showNoteLetters = MidiOptions.NoteNameNone

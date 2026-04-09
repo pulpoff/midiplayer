@@ -20,6 +20,7 @@ class SheetMusicWidget(Gtk.DrawingArea):
         self.sheet: Optional[SheetMusic] = None
         self._current_pulse = -10
         self._prev_pulse = -10
+        self._shade_x = 0  # x pixel of the currently shaded note
         self.set_draw_func(self._on_draw)
         self.set_hexpand(True)
         self.set_vexpand(True)
@@ -28,6 +29,11 @@ class SheetMusicWidget(Gtk.DrawingArea):
         click.connect("pressed", self._on_click)
         self.add_controller(click)
         self._on_seek = None
+        self._scroller: Optional[Gtk.ScrolledWindow] = None
+
+    def set_scroller(self, scroller: Gtk.ScrolledWindow) -> None:
+        """Store a reference to the parent ScrolledWindow for auto-scroll."""
+        self._scroller = scroller
 
     def set_sheet(self, sheet: Optional[SheetMusic]) -> None:
         self.sheet = sheet
@@ -36,6 +42,7 @@ class SheetMusicWidget(Gtk.DrawingArea):
             self.set_content_height(sheet.total_height)
         self._current_pulse = -10
         self._prev_pulse = -10
+        self._shade_x = 0
         self.queue_draw()
 
     def set_seek_handler(self, callback) -> None:
@@ -45,19 +52,48 @@ class SheetMusicWidget(Gtk.DrawingArea):
         self._prev_pulse = self._current_pulse
         self._current_pulse = int(pulse)
         self.queue_draw()
+        # Auto-scroll to keep the shaded note visible
+        if self._scroller is not None and self.sheet is not None and self._shade_x > 0:
+            self._auto_scroll()
+
+    def _auto_scroll(self) -> None:
+        """Smoothly scroll so the shaded note stays near the center."""
+        hadj = self._scroller.get_hadjustment()
+        vadj = self._scroller.get_vadjustment()
+        if hadj is None:
+            return
+
+        viewport_w = hadj.get_page_size()
+        current_scroll = hadj.get_value()
+
+        if self.sheet and not self.sheet.scrollVert:
+            # Horizontal layout: keep shade_x around 40% from the left
+            target_x = self._shade_x - viewport_w * 0.4
+            target_x = max(0, min(target_x, hadj.get_upper() - viewport_w))
+
+            # Smooth scroll: move a fraction of the distance each tick
+            diff = target_x - current_scroll
+            if abs(diff) > 2:
+                # Move faster when far away, gentle when close
+                step = diff * 0.3
+                if abs(step) < 2:
+                    step = 2 if diff > 0 else -2
+                hadj.set_value(current_scroll + step)
+            else:
+                hadj.set_value(target_x)
 
     def _on_draw(self, area, cr, width, height) -> None:
         if self.sheet is None:
             cr.set_source_rgb(1, 1, 1)
             cr.paint()
-            cr.set_source_rgb(0, 0, 0)
-            cr.move_to(20, 30)
-            cr.set_font_size(14)
-            cr.show_text("Use the menu File > Open to select a MIDI file")
             return
         self.sheet.draw(cr, 0, 0, width, height)
         if self._current_pulse >= 0:
-            self.sheet.shade_notes(cr, self._current_pulse, self._prev_pulse)
+            x_shade, y_shade = self.sheet.shade_notes(
+                cr, self._current_pulse, self._prev_pulse
+            )
+            if x_shade > 0:
+                self._shade_x = x_shade
 
     def _on_click(self, gesture, n_press, x, y) -> None:
         if self.sheet is None or self._on_seek is None:
