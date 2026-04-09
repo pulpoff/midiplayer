@@ -230,18 +230,17 @@ class AudioPlayer:
         if self._midifile is None or self._options is None:
             return
         measure = self._midifile.Time.Measure
-        self._current_pulse = max(0.0, self._current_pulse - measure)
-        self._pause_pulse = self._current_pulse
-        if self._on_pulse_changed:
-            self._on_pulse_changed(self._current_pulse)
+        new_pulse = max(0.0, self._current_pulse - measure)
+        self.seek_to(new_pulse)
 
     def fast_forward(self) -> None:
         if self._midifile is None or self._options is None:
             return
         measure = self._midifile.Time.Measure
-        self._current_pulse += measure
-        if self._current_pulse > self._midifile.TotalPulses:
-            self._current_pulse -= measure
+        new_pulse = self._current_pulse + measure
+        if new_pulse > self._midifile.TotalPulses:
+            new_pulse = self._current_pulse
+        self.seek_to(new_pulse)
         self._pause_pulse = self._current_pulse
         if self._on_pulse_changed:
             self._on_pulse_changed(self._current_pulse)

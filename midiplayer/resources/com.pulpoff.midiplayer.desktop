@@ -1,7 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Midi Sheet Music
+Name=midiplayer
 Comment=MIDI sheet music player with piano and FluidSynth audio
+StartupWMClass=com.pulpoff.midiplayer
 Exec=python3 -m midiplayer %f
 Icon=midiplayer
 Terminal=false

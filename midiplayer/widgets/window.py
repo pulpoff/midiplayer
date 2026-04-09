@@ -30,7 +30,7 @@ from .sheet_music_widget import SheetMusicWidget
 
 class SheetMusicWindow(Gtk.ApplicationWindow):
     def __init__(self, app: Gtk.Application) -> None:
-        super().__init__(application=app, title="Midi Sheet Music")
+        super().__init__(application=app, title="midiplayer")
         self.set_default_size(980, 720)
         self.set_icon_name("midiplayer")
 
@@ -247,7 +247,7 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
         about = Gtk.AboutDialog(
             transient_for=self,
             modal=True,
-            program_name="Midi Sheet Music",
+            program_name="midiplayer",
             version="0.1.0",
             comments=(
                 "A modern GTK4 MIDI sheet music player for Linux.\n"
@@ -263,6 +263,21 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
         )
         if logo is not None:
             about.set_logo(logo)
+
+        # Walk the widget tree to make the program name label non-selectable
+        # and remove the link styling that GTK4 AboutDialog adds by default.
+        def _fix_labels(widget):
+            if isinstance(widget, Gtk.Label):
+                text = widget.get_text() or ""
+                if "midiplayer" == text.strip():
+                    widget.set_selectable(False)
+                    widget.set_markup(f"<b><big>{text}</big></b>")
+            child = widget.get_first_child()
+            while child is not None:
+                _fix_labels(child)
+                child = child.get_next_sibling()
+        _fix_labels(about)
+
         about.present()
 
     def _action_zoom_in(self, _action, _param) -> None:
@@ -348,10 +363,10 @@ class SheetMusicWindow(Gtk.ApplicationWindow):
 
     def _update_title(self) -> None:
         if self.midifile is None:
-            self.set_title("Midi Sheet Music")
+            self.set_title("midiplayer")
         else:
             self.set_title(
-                f"{os.path.basename(self.midifile.FileName)} - Midi Sheet Music"
+                f"{os.path.basename(self.midifile.FileName)} - midiplayer"
             )
 
     def _show_error(self, message: str) -> None:
