@@ -30,13 +30,21 @@ On Debian / Ubuntu / any derivative, the whole workflow is a single command:
 ./build.sh
 ```
 
-On first run, `build.sh` will `sudo apt-get install` any missing runtime
-dependencies and then launch the app. There is no compilation step — this
-is a pure Python project:
+On first run, `build.sh` will `sudo apt-get install` any missing system
+dependencies and `pip install` the FluidSynth Python binding, then launch
+the app. There is no compilation step — this is a pure Python project.
+
+System packages (from apt):
 
 ```
-python3 python3-gi python3-gi-cairo python3-cairo gir1.2-gtk-4.0
-fluidsynth python3-fluidsynth fluid-soundfont-gm
+python3 python3-pip python3-venv python3-gi python3-gi-cairo
+gir1.2-gtk-4.0 fluidsynth libfluidsynth3 fluid-soundfont-gm
+```
+
+Python packages (from pip, not packaged in Debian/Ubuntu):
+
+```
+pyfluidsynth
 ```
 
 You can also pass a MIDI file directly:
