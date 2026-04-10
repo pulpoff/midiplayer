@@ -276,15 +276,14 @@ class SheetMusicWindow(_BaseWindow):
                 application_icon="midiplayer",
                 version="0.1.2",
                 comments=(
-                    "A modern GTK4 MIDI sheet music player for Linux.\n"
-                    "Based on MidiSheetMusic 2.6 by Madhav Vaidyanathan.\n"
-                    "Modernized and updated by Pashkovsky Alexei in 2026.\n"
-                    "Ported to Python / GTK4 / Cairo / FluidSynth."
+                    "A native GNOME MIDI player with piano keyboard\n"
+                    "and scrolling note sheet display.\n"
+                    "Inspired by classic MIDI players from the Windows 3.11 era."
                 ),
                 website="https://github.com/pulpoff/midiplayer",
                 issue_url="https://github.com/pulpoff/midiplayer/issues",
                 license_type=Gtk.License.GPL_2_0,
-                copyright="Original: Madhav Vaidyanathan (GPLv2)\nPort: Pashkovsky Alexei, 2026",
+                copyright="Pashkovsky Alexei, 2026",
             )
             about.present()
         else:
@@ -294,15 +293,14 @@ class SheetMusicWindow(_BaseWindow):
                 program_name="MIDI player",
                 version="0.1.2",
                 comments=(
-                    "A modern GTK4 MIDI sheet music player for Linux.\n"
-                    "Based on MidiSheetMusic 2.6 by Madhav Vaidyanathan.\n"
-                    "Modernized and updated by Pashkovsky Alexei in 2026.\n"
-                    "Ported to Python / GTK4 / Cairo / FluidSynth."
+                    "A native GNOME MIDI player with piano keyboard\n"
+                    "and scrolling note sheet display.\n"
+                    "Inspired by classic MIDI players from the Windows 3.11 era."
                 ),
                 website="https://github.com/pulpoff/midiplayer",
                 website_label="github.com/pulpoff/midiplayer",
                 license_type=Gtk.License.GPL_2_0,
-                copyright="Original: Madhav Vaidyanathan (GPLv2)\nPort: Pashkovsky Alexei, 2026",
+                copyright="Pashkovsky Alexei, 2026",
             )
             if logo is not None:
                 about.set_logo(logo)
