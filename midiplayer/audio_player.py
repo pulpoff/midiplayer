@@ -80,9 +80,20 @@ class AudioPlayer:
             print("midiplayer: pyfluidsynth not installed — no audio")
             return False
 
-        # Create synth with generous polyphony and gain
-        self._synth = fluidsynth.Synth(gain=1.0, samplerate=44100)
-        self._synth.setting("synth.polyphony", 512)
+        # Create synth with tuned audio settings
+        self._synth = fluidsynth.Synth(gain=0.6, samplerate=44100)
+        self._synth.setting("synth.polyphony", 256)
+
+        # Larger audio buffer to prevent underruns / distortion
+        self._synth.setting("audio.period-size", 2048)
+        self._synth.setting("audio.periods", 4)
+
+        # Moderate reverb and chorus for cleaner sound
+        self._synth.setting("synth.reverb.active", 1)
+        self._synth.setting("synth.reverb.room-size", 0.3)
+        self._synth.setting("synth.reverb.damping", 0.5)
+        self._synth.setting("synth.reverb.level", 0.3)
+        self._synth.setting("synth.chorus.active", 0)  # disable chorus — saves CPU
 
         # Try audio drivers in preference order.
         # PipeWire exposes a PulseAudio compat layer, so 'pulseaudio' works
@@ -172,7 +183,8 @@ class AudioPlayer:
         if self._synth is not None:
             try:
                 # Map 0-100% to gain 0.0-2.0
-                self._synth.setting("synth.gain", self._volume_percent / 100.0 * 2.0)
+                # Map 0-100% to gain 0.0-0.8 (avoid clipping at high polyphony)
+                self._synth.setting("synth.gain", self._volume_percent / 100.0 * 0.8)
             except Exception:
                 pass
 

@@ -4,39 +4,37 @@
 
 <h1 align="center">MIDI player</h1>
 
-A modern GTK4 MIDI sheet music player for Linux, based on Madhav
-Vaidyanathan's [MidiSheetMusic](http://midisheetmusic.com/) 2.6.
+A native GNOME MIDI player with a piano keyboard and scrolling note
+sheet display. Inspired by classic MIDI players from the Windows 3.11 era,
+rebuilt for modern Linux with GTK4, libadwaita, Cairo, and FluidSynth.
 
 <p align="center">
   <img src="scr3.png" alt="MIDI player screenshot" width="800">
 </p>
 
-The original is a C#/Mono WinForms application that ships with a Linux build
-script targeting `xbuild` and the `timidity` CLI for playback. This project is
-a ground-up Python port that keeps the same look and layout algorithms but
-swaps the runtime out for a stack that's native on modern Debian/Ubuntu:
+**Features:**
 
-| Concern        | Original (2.6)           | This port                          |
-|----------------|--------------------------|-------------------------------------|
-| Language       | C# / Mono                | Python 3                            |
-| GUI toolkit    | System.Windows.Forms     | GTK 4 (PyGObject)                   |
-| Drawing        | System.Drawing / GDI+    | Cairo (via `Gtk.DrawingArea`)       |
-| MIDI synthesis | `timidity` subprocess    | **FluidSynth** (`python-fluidsynth`) |
-| Audio output   | ALSA via timidity        | PipeWire / PulseAudio / ALSA (auto) |
-| Build system   | `xbuild` + Mono          | `apt install` only — no compiler    |
+- Scrolling sheet music with treble and bass clef, key signatures,
+  beamed notes, accidentals, rests, and measure bars
+- Full piano keyboard with real-time note highlighting
+- FluidSynth audio synthesis via PipeWire / PulseAudio / ALSA
+- Playback controls: play, pause, stop, rewind, fast-forward
+- Speed control and volume with popover sliders
+- Timeline scrubbing with time display
+- Mouse scroll zoom on the note sheet
+- Auto-zoom to fit window width (including fullscreen)
+- 30-second time markers on the score
+- Opens `.mid` files from the GNOME file manager
+- Dark/light theme support via libadwaita
+- Recent files menu
 
-The goal is that the app **looks the same** as the original — same grand-staff
-engraving, same piano keyboard with left-hand / right-hand shading, same
-toolbar with rewind / play / stop / fast-forward / speed / volume — while
-running on a current GNOME desktop with proper audio hardware support.
-
-## Install from .deb (recommended)
+## Install from .deb
 
 Download the latest `.deb` from the
 [releases page](https://github.com/pulpoff/midiplayer/releases) and install:
 
 ```sh
-sudo dpkg -i midiplayer_0.1.0_all.deb
+sudo dpkg -i midiplayer_0.1.2_all.deb
 sudo apt-get install -f   # pulls in any missing dependencies
 ```
 
@@ -54,128 +52,35 @@ cd midiplayer
 ./build-deb.sh
 ```
 
-## Running from source (no install)
-
-On Debian / Ubuntu / any derivative, the whole workflow is a single command:
+## Running from source
 
 ```sh
-./build.sh
+./build.sh              # install deps + launch
+./build.sh file.mid     # install deps + open file
+./build.sh --run        # launch only (skip dep check)
 ```
 
-On first run, `build.sh` will `sudo apt-get install` any missing system
-dependencies and `pip install` the FluidSynth Python binding, then launch
-the app. There is no compilation step — this is a pure Python project.
-
-System packages (from apt):
+Dependencies (installed automatically by `build.sh`):
 
 ```
-python3 python3-pip python3-venv python3-gi python3-gi-cairo
-gir1.2-gtk-4.0 fluidsynth libfluidsynth3 fluid-soundfont-gm
+python3 python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1
+fluidsynth libfluidsynth3 fluid-soundfont-gm pyfluidsynth (pip)
 ```
 
-Python packages (from pip, not packaged in Debian/Ubuntu):
+## Keyboard shortcuts
 
-```
-pyfluidsynth
-```
-
-You can also pass a MIDI file directly:
-
-```sh
-./build.sh Bach__Musette_in_D_major.mid
-```
-
-Or skip the install / launch steps individually:
-
-```sh
-./build.sh --deps     # install runtime dependencies, don't launch
-./build.sh --run      # launch without re-checking dependencies
-./build.sh --run file.mid
-```
-
-The app can also be launched directly once dependencies are installed:
-
-```sh
-python3 -m midiplayer [file.mid]
-```
-
-## Status
-
-Functionally complete and smoke-tested against both bundled Bach MIDI
-files. The layout engine reproduces the engraving algorithms from the
-original pixel-for-pixel; the GUI matches the original's menu bar,
-toolbar, piano panel and scrollable sheet area.
-
-Landed:
-
-- Music theory primitives (`NoteScale`, `WhiteNote`, `Clef`, `Accid`,
-  `NoteDuration`, `TimeSignature`) and major key signature with
-  sharp/flat maps, per-measure accidental tracking, and key guessing
-- MIDI file parser (`MidiFileReader`, `MidiEvent`, `MidiNote`,
-  `MidiTrack`, `MidiFile`) with `ChangeMidiNotes`, `RoundStartTimes`,
-  `RoundDurations`, `SplitTrack`, `CombineToSingleTrack`,
-  `CombineToTwoTracks`, and `MidiOptions`
-- Music symbol classes with Cairo draw routines — `MusicSymbol`,
-  `BlankSymbol`, `BarSymbol`, `ClefSymbol` (PNG clef images),
-  `TimeSigSymbol` (PNG digit images), `AccidSymbol`, `RestSymbol`,
-  `ChordSymbol` with `NoteData`, ledger lines, dotted notes and beam
-  creation, plus `Stem` with curvy flags and horizontal beams
-- Layout engine (`ClefMeasures`, `SymbolWidths`, `Staff`, `SheetMusic`):
-  chord grouping, bar insertion, rest filling, clef changes, cross-track
-  alignment, staff partitioning respecting measure boundaries, full
-  justification, beam creation, zoom, drawing and playback shading
-- `Piano` keyboard renderer matching the original's
-  pixel-perfect look (black border frame, realistic black keys, two-
-  colour shading for left/right hand in two-track songs)
-- `AudioPlayer` — FluidSynth backend replacing the original `timidity`
-  subprocess, with live transpose / mute / instrument / volume /
-  speed support, talking to PipeWire / PulseAudio / ALSA automatically
-- GTK4 widgets (`SheetMusicWidget`, `PianoWidget`, `PlayerWidget`) and
-  `SheetMusicWindow` with the original's File / View / Color / Tracks /
-  Notes / Help menu bar, Play / Stop / Rewind / Fast-forward buttons,
-  Speed and Volume sliders, and click-to-seek
-- `build.sh` one-shot installer + entry point
-
-## Layout
-
-```
-build.sh                    One-shot installer + launcher
-midiplayer/                 Python package
-  __main__.py               python -m midiplayer entry point
-  app.py                    Gtk.Application subclass
-  music_theory.py           NoteScale, WhiteNote, Clef, Accid, TimeSignature
-  key_signature.py          KeySignature with sharp/flat maps + guessing
-  midi_file_reader.py       Binary MIDI reader
-  midi_event.py             Raw MIDI event
-  midi_note.py              Parsed MIDI note
-  midi_track.py             MIDI track with note list + lyrics
-  midi_file.py              Top-level parser + ChangeMidiNotes + splitting
-  midi_options.py           Sheet + sound option container
-  sheet_constants.py        Per-note-size drawing constants
-  symbols.py                MusicSymbol base + BarSymbol, BlankSymbol,
-                            ClefSymbol, TimeSigSymbol, AccidSymbol,
-                            RestSymbol, LyricSymbol
-  stem.py                   Stem with vertical line, flags, and beams
-  chord_symbol.py           ChordSymbol + NoteData + beam creation
-  clef_measures.py          Per-measure treble/bass clef decision
-  symbol_widths.py          Cross-track width alignment
-  staff.py                  Single staff row: draw + shade
-  sheet_music.py            Top-level layout engine
-  piano.py                  Keyboard renderer (toolkit-agnostic)
-  audio_player.py           FluidSynth playback backend
-  resources/                Clef + time signature PNGs from the original
-  widgets/                  GTK4 DrawingArea wrappers
-    sheet_music_widget.py
-    piano_widget.py
-    player_widget.py
-    window.py               ApplicationWindow with menu bar + layout
-MidiSheetMusic-2.6-linux-src.tar.gz   Original C# source (reference)
-Bach__Invention_No._13.mid  Sample MIDI for smoke tests
-Bach__Musette_in_D_major.mid
-```
+| Key | Action |
+|-----|--------|
+| `+` / `=` / `Ctrl+=` | Zoom in |
+| `-` / `Ctrl+-` | Zoom out |
+| `0` / `Ctrl+0` | Reset zoom |
+| `Ctrl+O` | Open file |
+| `Ctrl+W` | Close file |
+| `Ctrl+Q` | Quit |
+| Mouse scroll | Zoom in/out on sheet |
 
 ## Credits
 
-The sheet music engraving algorithms, layout math, and visual design are all
-from Madhav Vaidyanathan's MidiSheetMusic 2.6, licensed under GPLv2. This port
-preserves that license.
+Inspired by Madhav Vaidyanathan's
+[MidiSheetMusic](http://midisheetmusic.com/) 2.6 (GPLv2).
+Licensed under GPLv2.
